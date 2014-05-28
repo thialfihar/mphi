@@ -1,5 +1,5 @@
-#ifndef __MATRIX_H__
-#define __MATRIX_H__
+#ifndef __GENERAL_MATRIX_H__
+#define __GENERAL_MATRIX_H__
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -10,30 +10,31 @@
 
 #include "functions.h"
 
-template <unsigned int N>
+namespace gm {
+
 class Matrix {
  public:
-    inline Matrix(unsigned int k)
-        :k(k) {
+    inline Matrix(unsigned int n, unsigned int k)
+        :n(n), k(k) {
     }
 
-    inline void operator=(const Matrix<N> &other) {
-        memcpy(m, other.m, sizeof(unsigned int) * N * N);
+    inline void operator=(const Matrix &other) {
+        memcpy(m, other.m, sizeof(unsigned int) * n * n);
     }
 
     inline void zero() {
-        memset(m, 0, sizeof(unsigned int) * N * N);
+        memset(m, 0, sizeof(unsigned int) * n * n);
     }
 
     inline void randomize() {
-        for (unsigned int i = 0; i < N * N; ++i) {
+        for (unsigned int i = 0; i < n * n; ++i) {
             m[i] = ((unsigned int) rand() % (k * 1000000)) / 1000000;
         }
     }
 
     inline bool next() {
         unsigned int i = 0;
-        while (i < N * N) {
+        while (i < n * n) {
             m[i] = (m[i] + 1) % k;
             if (m[i] != 0) {
                 return true;
@@ -45,17 +46,17 @@ class Matrix {
 
     inline bool next_triangular() {
         unsigned int i = 0;
-        while (i < N * N) {
+        while (i < n * n) {
             m[i] = (m[i] + 1) % k;
             if (m[i] != 0) {
                 return true;
             }
-            if (i % N == i / N) {
+            if (i % n == i / n) {
                 // set diagonal element to 1 after it turned 0
                 m[i] = 1;
             }
             ++i;
-            while (i < N * N && i % N < i / N) {
+            while (i < n * n && i % n < i / n) {
                 ++i;
             }
         }
@@ -64,33 +65,33 @@ class Matrix {
 
     inline void make_identity() {
         zero();
-        for (unsigned int i = 0; i < N * N; i += N + 1) {
+        for (unsigned int i = 0; i < n * n; i += n + 1) {
             m[i] = 1;
         }
     }
 
     inline bool is_identity() {
-        if (N == 1) {
+        if (n == 1) {
             return m[0] == 1;
-        } else if (N == 2) {
+        } else if (n == 2) {
             return m[0] == 1 && m[1] == 0 &&
                    m[2] == 0 && m[3] == 1;
-        } else if (N == 3) {
+        } else if (n == 3) {
             return m[0] == 1 && m[1] == 0 && m[2] == 0 &&
                    m[3] == 0 && m[4] == 1 && m[5] == 0 &&
                    m[6] == 0 && m[7] == 0 && m[8] == 1;
-        } else if (N == 4) {
+        } else if (n == 4) {
             return m[0] == 1 && m[1] == 0 && m[2] == 0 && m[3] == 0 &&
                    m[4] == 0 && m[5] == 1 && m[6] == 0 && m[7] == 0 &&
                    m[8] == 0 && m[9] == 0 && m[10] == 1 && m[11] == 0 &&
                    m[12] == 0 && m[13] == 0 && m[14] == 0 && m[15] == 1;
-        } else if (N == 5) {
+        } else if (n == 5) {
             return m[0] == 1 && m[1] == 0 && m[2] == 0 && m[3] == 0 && m[4] == 0 &&
                    m[5] == 0 && m[6] == 1 && m[7] == 0 && m[8] == 0 && m[9] == 0 &&
                    m[10] == 0 && m[11] == 0 && m[12] == 1 && m[13] == 0 && m[14] == 0 &&
                    m[15] == 0 && m[16] == 0 && m[17] == 0 && m[18] == 1 && m[19] == 0 &&
                    m[20] == 0 && m[21] == 0 && m[22] == 0 && m[23] == 0 && m[24] == 1;
-        } else if (N == 6) {
+        } else if (n == 6) {
             return m[0] == 1 && m[1] == 0 && m[2] == 0 && m[3] == 0 && m[4] == 0 && m[5] == 0 &&
                    m[6] == 0 && m[7] == 1 && m[8] == 0 && m[9] == 0 && m[10] == 0 && m[11] == 0 &&
                    m[12] == 0 && m[13] == 0 && m[14] == 1 && m[15] == 0 && m[16] == 0 && m[17] == 0 &&
@@ -99,12 +100,12 @@ class Matrix {
                    m[30] == 0 && m[31] == 0 && m[32] == 0 && m[33] == 0 && m[34] == 0 && m[35] == 1;
         }
         unsigned int d = 0;
-        for (unsigned int i = 0; i < N * N; ++i) {
+        for (unsigned int i = 0; i < n * n; ++i) {
             if (i == d) {
                 if (m[i] != 1) {
                     return false;
                 }
-                d += N + 1;
+                d += n + 1;
             } else if (m[i] != 0) {
                 return false;
             }
@@ -114,7 +115,7 @@ class Matrix {
     }
 
     inline bool is_zero() {
-        for (unsigned int i = 0; i < N * N; ++i) {
+        for (unsigned int i = 0; i < n * n; ++i) {
             if (m[i] != 0) {
                 return false;
             }
@@ -123,22 +124,22 @@ class Matrix {
     }
 
     inline unsigned int &at(unsigned int row, unsigned int column) {
-        return m[row * N + column];
+        return m[row * n + column];
     }
 
-    inline void mult(Matrix<N> &other, Matrix<N> &result) {
+    inline void mult(Matrix &other, Matrix &result) {
         result.zero();
 
-        if (N == 1) {
+        if (n == 1) {
             result.m[0] = (m[0] * other.m[0]) % k;
             return;
-        } else if (N == 2) {
+        } else if (n == 2) {
             result.m[0] = (m[0] * other.m[0] + m[1] * other.m[2]) % k;
             result.m[1] = (m[0] * other.m[1] + m[1] * other.m[3]) % k;
             result.m[2] = (m[2] * other.m[0] + m[3] * other.m[2]) % k;
             result.m[3] = (m[2] * other.m[1] + m[3] * other.m[3]) % k;
             return;
-        } else if (N == 3) {
+        } else if (n == 3) {
             result.m[0] = (m[0] * other.m[0] + m[1] * other.m[3] + m[2] * other.m[6]) % k;
             result.m[1] = (m[0] * other.m[1] + m[1] * other.m[4] + m[2] * other.m[7]) % k;
             result.m[2] = (m[0] * other.m[2] + m[1] * other.m[5] + m[2] * other.m[8]) % k;
@@ -149,7 +150,7 @@ class Matrix {
             result.m[7] = (m[6] * other.m[1] + m[7] * other.m[4] + m[8] * other.m[7]) % k;
             result.m[8] = (m[6] * other.m[2] + m[7] * other.m[5] + m[8] * other.m[8]) % k;
             return;
-        } else if (N == 4) {
+        } else if (n == 4) {
             result.m[0] = (m[0] * other.m[0] + m[1] * other.m[4] + m[2] * other.m[8] + m[3] * other.m[12]) % k;
             result.m[1] = (m[0] * other.m[1] + m[1] * other.m[5] + m[2] * other.m[9] + m[3] * other.m[13]) % k;
             result.m[2] = (m[0] * other.m[2] + m[1] * other.m[6] + m[2] * other.m[10] + m[3] * other.m[14]) % k;
@@ -169,30 +170,30 @@ class Matrix {
             return;
         }
 
-        for (unsigned int r = 0; r < N; ++r) {
-            for (unsigned int c = 0; c < N; ++c) {
+        for (unsigned int r = 0; r < n; ++r) {
+            for (unsigned int c = 0; c < n; ++c) {
                 unsigned int sum = 0;
-                for (unsigned int i = 0; i < N; ++i) {
-                    sum += m[r * N + i] * other.m[i * N + c];
+                for (unsigned int i = 0; i < n; ++i) {
+                    sum += m[r * n + i] * other.m[i * n + c];
                 }
-                result.m[r * N + c] = sum % k;
+                result.m[r * 10 + c] = sum % k;
             }
         }
     }
 
-    inline void mult(Matrix<N> &other) {
-        if (N == 1) {
+    inline void mult(Matrix &other) {
+        if (n == 1) {
             buffer[0] = (m[0] * other.m[0]) % k;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
+            memcpy(m, buffer, sizeof(unsigned int) * n * n);
             return;
-        } else if (N == 2) {
+        } else if (n == 2) {
             buffer[0] = (m[0] * other.m[0] + m[1] * other.m[2]) % k;
             buffer[1] = (m[0] * other.m[1] + m[1] * other.m[3]) % k;
             buffer[2] = (m[2] * other.m[0] + m[3] * other.m[2]) % k;
             buffer[3] = (m[2] * other.m[1] + m[3] * other.m[3]) % k;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
+            memcpy(m, buffer, sizeof(unsigned int) * n * n);
             return;
-        } else if (N == 3) {
+        } else if (n == 3) {
             buffer[0] = (m[0] * other.m[0] + m[1] * other.m[3] + m[2] * other.m[6]) % k;
             buffer[1] = (m[0] * other.m[1] + m[1] * other.m[4] + m[2] * other.m[7]) % k;
             buffer[2] = (m[0] * other.m[2] + m[1] * other.m[5] + m[2] * other.m[8]) % k;
@@ -202,9 +203,9 @@ class Matrix {
             buffer[6] = (m[6] * other.m[0] + m[7] * other.m[3] + m[8] * other.m[6]) % k;
             buffer[7] = (m[6] * other.m[1] + m[7] * other.m[4] + m[8] * other.m[7]) % k;
             buffer[8] = (m[6] * other.m[2] + m[7] * other.m[5] + m[8] * other.m[8]) % k;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
+            memcpy(m, buffer, sizeof(unsigned int) * n * n);
             return;
-        } else if (N == 4) {
+        } else if (n == 4) {
             buffer[0] = (m[0] * other.m[0] + m[1] * other.m[4] + m[2] * other.m[8] + m[3] * other.m[12]) % k;
             buffer[1] = (m[0] * other.m[1] + m[1] * other.m[5] + m[2] * other.m[9] + m[3] * other.m[13]) % k;
             buffer[2] = (m[0] * other.m[2] + m[1] * other.m[6] + m[2] * other.m[10] + m[3] * other.m[14]) % k;
@@ -221,23 +222,23 @@ class Matrix {
             buffer[13] = (m[12] * other.m[1] + m[13] * other.m[5] + m[14] * other.m[9] + m[15] * other.m[13]) % k;
             buffer[14] = (m[12] * other.m[2] + m[13] * other.m[6] + m[14] * other.m[10] + m[15] * other.m[14]) % k;
             buffer[15] = (m[12] * other.m[3] + m[13] * other.m[7] + m[14] * other.m[11] + m[15] * other.m[15]) % k;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
+            memcpy(m, buffer, sizeof(unsigned int) * n * n);
             return;
         }
 
-        for (unsigned int r = 0; r < N; ++r) {
-            for (unsigned int c = 0; c < N; ++c) {
+        for (unsigned int r = 0; r < n; ++r) {
+            for (unsigned int c = 0; c < n; ++c) {
                 unsigned int sum = 0;
-                for (unsigned int i = 0; i < N; ++i) {
-                    sum += m[r * N + i] * other.m[i * N + c];
+                for (unsigned int i = 0; i < n; ++i) {
+                    sum += m[r * n + i] * other.m[i * n + c];
                 }
-                buffer[r * N + c] = sum % k;
+                buffer[r * n + c] = sum % k;
             }
         }
-        memcpy(m, buffer, sizeof(unsigned int) * N * N);
+        memcpy(m, buffer, sizeof(unsigned int) * n * n);
     }
 
-    void power(mpz_class e, Matrix<N> &result) {
+    void power(mpz_class e, Matrix &result) {
         if (e == 0) {
             result.make_identity();
             return;
@@ -254,10 +255,10 @@ class Matrix {
     }
 
     void print() {
-        for (unsigned int r = 0; r < N; ++r) {
-            for (unsigned int c = 0; c < N; ++c) {
+        for (unsigned int r = 0; r < n; ++r) {
+            for (unsigned int c = 0; c < n; ++c) {
                 printf("%8d", at(r, c));
-                if (c == N - 1) {
+                if (c == n - 1) {
                     printf("\n");
                 } else {
                     printf("\t");
@@ -266,137 +267,14 @@ class Matrix {
         }
     }
 
-    //static mpz_class find_lambda(unsigned int k);
-    //static mpz_class find_probable_lambda(unsigned int k);
-
-    static mpz_class find_lambda(unsigned int k) {
-        mpz_class phi = phi_n(N, k);
-        vector<mpz_class> candidates = get_divisors(phi);
-        mpz_class result = 1;
-        if (phi > 100000000) {
-            //return 0;
-        }
-
-        Matrix<N> m(k);
-        m.zero();
-        // for triangular approach
-        //m.make_identity();
-        unsigned int c = 0;
-        while (m.next() && c < 20000) {
-            //m.print();
-            //++c;
-            Matrix<N> tmp(k);
-            mpz_class e = 1;
-            m.power(result, tmp);
-            if (tmp.is_zero()) {
-                continue;
-            } else if (tmp.is_identity()) {
-                continue;
-            }
-            for (unsigned int i = 0; i < candidates.size(); ++i) {
-                m.power(candidates[i], tmp);
-                if (tmp.is_zero()) {
-                    e = 1;
-                    //printf("break at %d\n", i);
-                    break;
-                } else if (tmp.is_identity()) {
-                    e = candidates[i];
-                    break;
-                }
-            }
-            if (e > 1) {
-                mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
-                auto it = candidates.begin();
-                while (it != candidates.end()) {
-                    if (result % *it == 0) {
-                        candidates.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-                //printf("c: %d - %s\n", (unsigned int)candidates.size(), result.get_str().c_str());
-            }
-        }
-
-        return result;
-    }
-
-    static mpz_class find_probable_lambda(unsigned int k) {
-        mpz_class phi = phi_n(N, k);
-        vector<mpz_class> candidates = get_divisors(phi);
-        mpz_class result = 1;
-        if (phi < 20000) {
-            return find_lambda(k);
-        }
-
-        Matrix<N> m(k);
-        unsigned int c = 0;
-        unsigned int z = 0;
-        unsigned int max_c = 100;
-        while (c < max_c) {
-            m.randomize();
-            //printf("%d %d\n", c, z);
-            //m.print();
-            Matrix<N> tmp(k);
-            mpz_class e = 1;
-            m.power(result, tmp);
-            if (tmp.is_zero()) {
-                ++z;
-                if (z % 10 == 0) {
-                    printf("z: %d\n", z);
-                }
-                continue;
-            } else if (tmp.is_identity()) {
-                ++c;
-                if (c % 10 == 0) {
-                    printf("%.f%%\n", 100.0 * c / max_c);
-                }
-                continue;
-            }
-            for (unsigned int i = 0; i < candidates.size(); ++i) {
-                //printf("%d/%d\n", i, candidates.size());
-                m.power(candidates[i], tmp);
-                if (tmp.is_zero()) {
-                    ++z;
-                    if (z % 10 == 0) {
-                        printf("z: %d\n", z);
-                    }
-                    e = 1;
-                    //printf("break at %d\n", i);
-                    break;
-                } else if (tmp.is_identity()) {
-                    e = candidates[i];
-                    ++c;
-                    if (c % 10 == 0) {
-                        printf("%.f%%\n", 100.0 * c / max_c);
-                    }
-                    break;
-                }
-            }
-            if (e > 1) {
-                mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
-                auto it = candidates.begin();
-                while (it != candidates.end()) {
-                    if (result % *it == 0) {
-                        candidates.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-                printf("%d c: %d - %s\n", c, (unsigned int)candidates.size(), result.get_str().c_str());
-            }
-        }
-
-        return result;
-    }
-
  private:
-    const unsigned int k;
-    unsigned int m[N * N];
-    static unsigned int buffer[N * N];
+    const unsigned int n, k;
+    unsigned int m[20 * 20];
+    static unsigned int buffer[20 * 20];
 };
 
-template <unsigned int N>
-unsigned int Matrix<N>::buffer[N * N];
+unsigned int Matrix::buffer[20 * 20];
+
+}
 
 #endif
