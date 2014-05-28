@@ -210,93 +210,37 @@ class Matrix {
         }
     }
 
-    mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors) {
-        mpz_class exponent = phi;
-        Matrix<N, K> tmp;
-        for (unsigned int i = 0; i < factors.size(); ++i) {
-            mpz_class e = exponent;
-            for (unsigned int j = 0; j < factors[i].second; ++j) {
-                e /= factors[i].first;
-                power(e, tmp);
-                if (!tmp.is_identity()) {
-                    break;
-                }
-                exponent = e;
-            }
-        }
-
-        return exponent;
-    }
-
-    static mpz_class find_lambda() {
-        mpz_class phi = phi_n(N, K);
-        Factors factors = factorize(phi);
-        vector<mpz_class> candidates = get_divisors(phi);
-        mpz_class result = 1;
-
-        Matrix<N, K> m;
-        m.zero();
-        // for triangular approach
-        //m.make_identity();
-        unsigned int c = 0;
-        Matrix<N, K> tmp;
-        while (m.next()) {
-            //m.print();
-            //++c;
-            mpz_class e = 1;
-            m.power(phi, tmp);
-            if (tmp.is_zero()) {
-                continue;
-            } else if (!tmp.is_identity()) {
-                // singular matrix, ignore
-                continue;
-            }
-
-            m.power(result, tmp);
-            if (tmp.is_zero()) {
-                continue;
-            } else if (tmp.is_identity()) {
-                continue;
-            }
-            e = m.get_minimal_exponent(phi, factors);
-
-            if (e > 1) {
-                mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
-                auto it = candidates.begin();
-                while (it != candidates.end()) {
-                    if (result % *it == 0) {
-                        candidates.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-                //printf("c: %d - %s\n", (unsigned int)candidates.size(), result.get_str().c_str());
-            }
-        }
-
-        return result;
-    }
-
     static mpz_class find_probable_lambda() {
         mpz_class phi = phi_n(N, K);
-        Factors factors = factorize(phi);
         vector<mpz_class> candidates = get_divisors(phi);
         //printf("phi = %s, first = %s, last = %s\n", phi.get_str().c_str(), candidates[0].get_str().c_str(), candidates[candidates.size() - 1].get_str().c_str());
         candidates.erase(candidates.begin());
         candidates.pop_back();
+        bool check_all = false;
         mpz_class result = 1;
         if (phi < 2000000) {
-            return find_lambda();
+            check_all = true;
         }
 
         Matrix<N, K> m;
+        m.zero();
         unsigned int c = 0;
         unsigned int z = 0;
         unsigned int s = 0;
         unsigned int max_c = 1000000;
-        Matrix<N, K> tmp;
-        while (c < max_c) {
-            m.randomize();
+        Matrix<N, K> tmp, tmp2;
+        while (true) {
+            if (check_all) {
+                if (!m.next()) {
+                    break;
+                }
+            } else {
+                if (c >= max_c) {
+                    break;
+                }
+                m.randomize();
+            }
+
             //printf("%d %d\n", c, z);
             //m.print();
             mpz_class e = 1;
@@ -322,23 +266,53 @@ class Matrix {
                 continue;
             }
 
-            e = m.get_minimal_exponent(phi, factors);
-
-            if (e > 1) {
-                ++c;
-                if (c % 100000 == 0) {
-                    printf("%.f%%\n", 100.0 * c / max_c);
+            int ugh = 0;
+            for (unsigned int i = 0; i < candidates.size(); ++i) {
+                tmp.power(candidates[i], tmp2);
+                if (tmp2.is_zero()) {
+                    ++z;
+                    if (z % 100 == 0) {
+                        printf("z: %d\n", z);
+                    }
+                    e = 1;
+                    ugh = -1;
+                    //printf("break at %d\n", i);
+                    break;
+                } else if (tmp2.is_identity()) {
+                    e = candidates[i];
+                    ++c;
+                    if (c % 100000 == 0) {
+                        printf("%.f%%\n", 100.0 * c / max_c);
+                    }
+                    ugh = 1;
+                    break;
                 }
-                mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
+            }
+            if (ugh == 0) {
+                printf("wtf?\n");
+                m.print();
+            }
+            if (e > 1) {
+                //mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
+                result *= e;
                 /*auto it = candidates.begin();
                 while (it != candidates.end()) {
-                    if (result % *it == 0) {
-                        candidates.erase(it);
-                    } else {
+                    if ((*it) % result == 0) {
+                        *it = (*it) / result;
                         ++it;
+                    } else {
+                        candidates.erase(it);
+                    }
+                }*/
+                vector<mpz_class> new_candidates;
+                new_candidates.reserve(candidates.size());
+                for (unsigned int i = 0; i < candidates.size(); ++i) {
+                    if (candidates[i] % e == 0) {
+                        new_candidates.push_back(candidates[i] / e);
                     }
                 }
-                printf("%d c: %d - %s\n", c, (unsigned int)candidates.size(), result.get_str().c_str());*/
+                candidates = new_candidates;
+                printf("rest: %d - %s\n", (unsigned int) candidates.size(), result.get_str().c_str());
             }
         }
 
