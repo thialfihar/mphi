@@ -6,8 +6,8 @@
 #include "GeneralMatrix.h"
 
 #define MAX_MULTIPLICATIONS 1000000
-#define N 6
-#define K 65
+#define N 10
+#define K 6
 
 float timediff(clock_t t1, clock_t t2) {
     return (float) (t2 - t1) / CLOCKS_PER_SEC;
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     srand(2107);
 
     clock_t t1 = clock();
-    Matrix<N> m1(K), m2(K), result(K);
+    Matrix<N, K> m1, m2, result;
     m1.randomize();
     m2.randomize();
     clock_t noise_t = 0;
