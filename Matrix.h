@@ -13,6 +13,16 @@
 template <unsigned int N, unsigned int K>
 class Matrix {
  public:
+    inline Matrix() {
+        m = new unsigned int[N * N];
+    }
+
+    inline ~Matrix() {
+        if (m) {
+            delete[] m;
+        }
+    }
+
     inline void operator=(const Matrix<N, K> &other) {
         memcpy(m, other.m, sizeof(unsigned int) * N * N);
     }
@@ -65,7 +75,7 @@ class Matrix {
         }
     }
 
-    inline bool is_identity() {
+    inline bool is_identity() const {
         if (N == 1) {
             return m[0] == 1;
         } else if (N == 2) {
@@ -109,7 +119,7 @@ class Matrix {
         return true;
     }
 
-    inline bool is_zero() {
+    inline bool is_zero() const {
         for (unsigned int i = 0; i < N * N; ++i) {
             if (m[i] != 0) {
                 return false;
@@ -122,116 +132,55 @@ class Matrix {
         return m[row * N + column];
     }
 
-    inline void mult(const Matrix<N, K> &other, Matrix<N, K> &result) {
-        if (N == 1) {
-            result.m[0] = (m[0] * other.m[0]) % K;
-            return;
-        } else if (N == 2) {
-            result.m[0] = (m[0] * other.m[0] + m[1] * other.m[2]) % K;
-            result.m[1] = (m[0] * other.m[1] + m[1] * other.m[3]) % K;
-            result.m[2] = (m[2] * other.m[0] + m[3] * other.m[2]) % K;
-            result.m[3] = (m[2] * other.m[1] + m[3] * other.m[3]) % K;
-            return;
-        } else if (N == 3) {
-            result.m[0] = (m[0] * other.m[0] + m[1] * other.m[3] + m[2] * other.m[6]) % K;
-            result.m[1] = (m[0] * other.m[1] + m[1] * other.m[4] + m[2] * other.m[7]) % K;
-            result.m[2] = (m[0] * other.m[2] + m[1] * other.m[5] + m[2] * other.m[8]) % K;
-            result.m[3] = (m[3] * other.m[0] + m[4] * other.m[3] + m[5] * other.m[6]) % K;
-            result.m[4] = (m[3] * other.m[1] + m[4] * other.m[4] + m[5] * other.m[7]) % K;
-            result.m[5] = (m[3] * other.m[2] + m[4] * other.m[5] + m[5] * other.m[8]) % K;
-            result.m[6] = (m[6] * other.m[0] + m[7] * other.m[3] + m[8] * other.m[6]) % K;
-            result.m[7] = (m[6] * other.m[1] + m[7] * other.m[4] + m[8] * other.m[7]) % K;
-            result.m[8] = (m[6] * other.m[2] + m[7] * other.m[5] + m[8] * other.m[8]) % K;
-            return;
-        } else if (N == 4) {
-            result.m[0] = (m[0] * other.m[0] + m[1] * other.m[4] + m[2] * other.m[8] + m[3] * other.m[12]) % K;
-            result.m[1] = (m[0] * other.m[1] + m[1] * other.m[5] + m[2] * other.m[9] + m[3] * other.m[13]) % K;
-            result.m[2] = (m[0] * other.m[2] + m[1] * other.m[6] + m[2] * other.m[10] + m[3] * other.m[14]) % K;
-            result.m[3] = (m[0] * other.m[3] + m[1] * other.m[7] + m[2] * other.m[11] + m[3] * other.m[15]) % K;
-            result.m[4] = (m[4] * other.m[0] + m[5] * other.m[4] + m[6] * other.m[8] + m[7] * other.m[12]) % K;
-            result.m[5] = (m[4] * other.m[1] + m[5] * other.m[5] + m[6] * other.m[9] + m[7] * other.m[13]) % K;
-            result.m[6] = (m[4] * other.m[2] + m[5] * other.m[6] + m[6] * other.m[10] + m[7] * other.m[14]) % K;
-            result.m[7] = (m[4] * other.m[3] + m[5] * other.m[7] + m[6] * other.m[11] + m[7] * other.m[15]) % K;
-            result.m[8] = (m[8] * other.m[0] + m[9] * other.m[4] + m[10] * other.m[8] + m[11] * other.m[12]) % K;
-            result.m[9] = (m[8] * other.m[1] + m[9] * other.m[5] + m[10] * other.m[9] + m[11] * other.m[13]) % K;
-            result.m[10] = (m[8] * other.m[2] + m[9] * other.m[6] + m[10] * other.m[10] + m[11] * other.m[14]) % K;
-            result.m[11] = (m[8] * other.m[3] + m[9] * other.m[7] + m[10] * other.m[11] + m[11] * other.m[15]) % K;
-            result.m[12] = (m[12] * other.m[0] + m[13] * other.m[4] + m[14] * other.m[8] + m[15] * other.m[12]) % K;
-            result.m[13] = (m[12] * other.m[1] + m[13] * other.m[5] + m[14] * other.m[9] + m[15] * other.m[13]) % K;
-            result.m[14] = (m[12] * other.m[2] + m[13] * other.m[6] + m[14] * other.m[10] + m[15] * other.m[14]) % K;
-            result.m[15] = (m[12] * other.m[3] + m[13] * other.m[7] + m[14] * other.m[11] + m[15] * other.m[15]) % K;
-            return;
-        }
+    inline const unsigned int &at(unsigned int row, unsigned int column) const {
+        return m[row * N + column];
+    }
 
+    inline void mult(const Matrix<N, K> &other, Matrix<N, K> &result) const {
         for (unsigned int r = 0; r < N; ++r) {
             for (unsigned int c = 0; c < N; ++c) {
                 unsigned int sum = 0;
                 for (unsigned int i = 0; i < N; ++i) {
-                    sum += m[r * N + i] * other.m[i * N + c];
+                    sum += at(r, i) * other.at(i, c);
                 }
-                result.m[r * N + c] = sum % K;
+                result.at(r, c) = sum % K;
             }
         }
     }
 
     inline void mult(const Matrix<N, K> &other) {
-        if (N == 1) {
-            buffer[0] = (m[0] * other.m[0]) % K;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
-            return;
-        } else if (N == 2) {
-            buffer[0] = (m[0] * other.m[0] + m[1] * other.m[2]) % K;
-            buffer[1] = (m[0] * other.m[1] + m[1] * other.m[3]) % K;
-            buffer[2] = (m[2] * other.m[0] + m[3] * other.m[2]) % K;
-            buffer[3] = (m[2] * other.m[1] + m[3] * other.m[3]) % K;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
-            return;
-        } else if (N == 3) {
-            buffer[0] = (m[0] * other.m[0] + m[1] * other.m[3] + m[2] * other.m[6]) % K;
-            buffer[1] = (m[0] * other.m[1] + m[1] * other.m[4] + m[2] * other.m[7]) % K;
-            buffer[2] = (m[0] * other.m[2] + m[1] * other.m[5] + m[2] * other.m[8]) % K;
-            buffer[3] = (m[3] * other.m[0] + m[4] * other.m[3] + m[5] * other.m[6]) % K;
-            buffer[4] = (m[3] * other.m[1] + m[4] * other.m[4] + m[5] * other.m[7]) % K;
-            buffer[5] = (m[3] * other.m[2] + m[4] * other.m[5] + m[5] * other.m[8]) % K;
-            buffer[6] = (m[6] * other.m[0] + m[7] * other.m[3] + m[8] * other.m[6]) % K;
-            buffer[7] = (m[6] * other.m[1] + m[7] * other.m[4] + m[8] * other.m[7]) % K;
-            buffer[8] = (m[6] * other.m[2] + m[7] * other.m[5] + m[8] * other.m[8]) % K;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
-            return;
-        } else if (N == 4) {
-            buffer[0] = (m[0] * other.m[0] + m[1] * other.m[4] + m[2] * other.m[8] + m[3] * other.m[12]) % K;
-            buffer[1] = (m[0] * other.m[1] + m[1] * other.m[5] + m[2] * other.m[9] + m[3] * other.m[13]) % K;
-            buffer[2] = (m[0] * other.m[2] + m[1] * other.m[6] + m[2] * other.m[10] + m[3] * other.m[14]) % K;
-            buffer[3] = (m[0] * other.m[3] + m[1] * other.m[7] + m[2] * other.m[11] + m[3] * other.m[15]) % K;
-            buffer[4] = (m[4] * other.m[0] + m[5] * other.m[4] + m[6] * other.m[8] + m[7] * other.m[12]) % K;
-            buffer[5] = (m[4] * other.m[1] + m[5] * other.m[5] + m[6] * other.m[9] + m[7] * other.m[13]) % K;
-            buffer[6] = (m[4] * other.m[2] + m[5] * other.m[6] + m[6] * other.m[10] + m[7] * other.m[14]) % K;
-            buffer[7] = (m[4] * other.m[3] + m[5] * other.m[7] + m[6] * other.m[11] + m[7] * other.m[15]) % K;
-            buffer[8] = (m[8] * other.m[0] + m[9] * other.m[4] + m[10] * other.m[8] + m[11] * other.m[12]) % K;
-            buffer[9] = (m[8] * other.m[1] + m[9] * other.m[5] + m[10] * other.m[9] + m[11] * other.m[13]) % K;
-            buffer[10] = (m[8] * other.m[2] + m[9] * other.m[6] + m[10] * other.m[10] + m[11] * other.m[14]) % K;
-            buffer[11] = (m[8] * other.m[3] + m[9] * other.m[7] + m[10] * other.m[11] + m[11] * other.m[15]) % K;
-            buffer[12] = (m[12] * other.m[0] + m[13] * other.m[4] + m[14] * other.m[8] + m[15] * other.m[12]) % K;
-            buffer[13] = (m[12] * other.m[1] + m[13] * other.m[5] + m[14] * other.m[9] + m[15] * other.m[13]) % K;
-            buffer[14] = (m[12] * other.m[2] + m[13] * other.m[6] + m[14] * other.m[10] + m[15] * other.m[14]) % K;
-            buffer[15] = (m[12] * other.m[3] + m[13] * other.m[7] + m[14] * other.m[11] + m[15] * other.m[15]) % K;
-            memcpy(m, buffer, sizeof(unsigned int) * N * N);
-            return;
-        }
-
         for (unsigned int r = 0; r < N; ++r) {
             for (unsigned int c = 0; c < N; ++c) {
                 unsigned int sum = 0;
                 for (unsigned int i = 0; i < N; ++i) {
-                    sum += m[r * N + i] * other.m[i * N + c];
+                    sum += at(r, i) * other.at(i, c);
                 }
                 buffer[r * N + c] = sum % K;
             }
         }
-        memcpy(m, buffer, sizeof(unsigned int) * N * N);
+        //memcpy(m, buffer, sizeof(unsigned int) * N * N);
+        unsigned int *tmp = buffer;
+        buffer = m;
+        m = tmp;
     }
 
-    void power(const mpz_class &e, Matrix<N, K> &result) {
+    inline void square() {
+        for (unsigned int r = 0; r < N; ++r) {
+            for (unsigned int c = 0; c < N; ++c) {
+                unsigned int sum = 0;
+                for (unsigned int i = 0; i < N; ++i) {
+                    sum += at(r, i) * at(i, c);
+                }
+                buffer[r * N + c] = sum % K;
+            }
+        }
+        //memcpy(m, buffer, sizeof(unsigned int) * N * N);
+        unsigned int *tmp = buffer;
+        buffer = m;
+        m = tmp;
+    }
+
+    void power(const mpz_class &e, Matrix<N, K> &result) const {
         if (e == 0) {
             result.make_identity();
             return;
@@ -241,63 +190,76 @@ class Matrix {
         }
 
         power(e / 2, result);
-        result.mult(result);
+        //result.mult(result);
+        result.square();
         if (e % 2 == 1) {
             result.mult(*this);
         }
     }
 
-    void print() {
+    void print() const {
         for (unsigned int r = 0; r < N; ++r) {
             for (unsigned int c = 0; c < N; ++c) {
-                printf("%8d", at(r, c));
+                printf("%2d", at(r, c));
                 if (c == N - 1) {
                     printf("\n");
                 } else {
-                    printf("\t");
+                    printf(" ");
                 }
             }
         }
     }
 
-    //static mpz_class find_lambda(unsigned int K);
-    //static mpz_class find_probable_lambda(unsigned int K);
+    mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors) {
+        mpz_class exponent = phi;
+        Matrix<N, K> tmp;
+        for (unsigned int i = 0; i < factors.size(); ++i) {
+            mpz_class e = exponent;
+            for (unsigned int j = 0; j < factors[i].second; ++j) {
+                e /= factors[i].first;
+                power(e, tmp);
+                if (!tmp.is_identity()) {
+                    break;
+                }
+                exponent = e;
+            }
+        }
+
+        return exponent;
+    }
 
     static mpz_class find_lambda() {
         mpz_class phi = phi_n(N, K);
+        Factors factors = factorize(phi);
         vector<mpz_class> candidates = get_divisors(phi);
         mpz_class result = 1;
-        if (phi > 100000000) {
-            //return 0;
-        }
 
         Matrix<N, K> m;
         m.zero();
         // for triangular approach
         //m.make_identity();
         unsigned int c = 0;
-        while (m.next() && c < 20000) {
+        Matrix<N, K> tmp;
+        while (m.next()) {
             //m.print();
             //++c;
-            Matrix<N, K> tmp;
             mpz_class e = 1;
+            m.power(phi, tmp);
+            if (tmp.is_zero()) {
+                continue;
+            } else if (!tmp.is_identity()) {
+                // singular matrix, ignore
+                continue;
+            }
+
             m.power(result, tmp);
             if (tmp.is_zero()) {
                 continue;
             } else if (tmp.is_identity()) {
                 continue;
             }
-            for (unsigned int i = 0; i < candidates.size(); ++i) {
-                m.power(candidates[i], tmp);
-                if (tmp.is_zero()) {
-                    e = 1;
-                    //printf("break at %d\n", i);
-                    break;
-                } else if (tmp.is_identity()) {
-                    e = candidates[i];
-                    break;
-                }
-            }
+            e = m.get_minimal_exponent(phi, factors);
+
             if (e > 1) {
                 mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
                 auto it = candidates.begin();
@@ -317,59 +279,58 @@ class Matrix {
 
     static mpz_class find_probable_lambda() {
         mpz_class phi = phi_n(N, K);
+        Factors factors = factorize(phi);
         vector<mpz_class> candidates = get_divisors(phi);
+        //printf("phi = %s, first = %s, last = %s\n", phi.get_str().c_str(), candidates[0].get_str().c_str(), candidates[candidates.size() - 1].get_str().c_str());
+        candidates.erase(candidates.begin());
+        candidates.pop_back();
         mpz_class result = 1;
-        if (phi < 20000) {
+        if (phi < 2000000) {
             return find_lambda();
         }
 
         Matrix<N, K> m;
         unsigned int c = 0;
         unsigned int z = 0;
-        unsigned int max_c = 100;
+        unsigned int s = 0;
+        unsigned int max_c = 1000000;
+        Matrix<N, K> tmp;
         while (c < max_c) {
             m.randomize();
             //printf("%d %d\n", c, z);
             //m.print();
-            Matrix<N, K> tmp;
             mpz_class e = 1;
-            m.power(result, tmp);
+            m.power(phi, tmp);
             if (tmp.is_zero()) {
                 ++z;
-                if (z % 10 == 0) {
+                if (z % 100 == 0) {
                     printf("z: %d\n", z);
                 }
                 continue;
-            } else if (tmp.is_identity()) {
+            } else if (!tmp.is_identity()) {
+                ++s;
+                // singular matrix, ignore
+                continue;
+            }
+
+            m.power(result, tmp);
+            if (tmp.is_identity()) {
                 ++c;
-                if (c % 10 == 0) {
+                if (c % 100000 == 0) {
                     printf("%.f%%\n", 100.0 * c / max_c);
                 }
                 continue;
             }
-            for (unsigned int i = 0; i < candidates.size(); ++i) {
-                //printf("%d/%d\n", i, candidates.size());
-                m.power(candidates[i], tmp);
-                if (tmp.is_zero()) {
-                    ++z;
-                    if (z % 10 == 0) {
-                        printf("z: %d\n", z);
-                    }
-                    e = 1;
-                    //printf("break at %d\n", i);
-                    break;
-                } else if (tmp.is_identity()) {
-                    e = candidates[i];
-                    ++c;
-                    if (c % 10 == 0) {
-                        printf("%.f%%\n", 100.0 * c / max_c);
-                    }
-                    break;
-                }
-            }
+
+            e = m.get_minimal_exponent(phi, factors);
+
             if (e > 1) {
+                ++c;
+                if (c % 100000 == 0) {
+                    printf("%.f%%\n", 100.0 * c / max_c);
+                }
                 mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
-                auto it = candidates.begin();
+                /*auto it = candidates.begin();
                 while (it != candidates.end()) {
                     if (result % *it == 0) {
                         candidates.erase(it);
@@ -377,7 +338,7 @@ class Matrix {
                         ++it;
                     }
                 }
-                printf("%d c: %d - %s\n", c, (unsigned int)candidates.size(), result.get_str().c_str());
+                printf("%d c: %d - %s\n", c, (unsigned int)candidates.size(), result.get_str().c_str());*/
             }
         }
 
@@ -385,11 +346,11 @@ class Matrix {
     }
 
  private:
-    unsigned int m[N * N];
-    static unsigned int buffer[N * N];
+    unsigned int *m;
+    static unsigned int *buffer;
 };
 
 template <unsigned int N, unsigned int K>
-unsigned int Matrix<N, K>::buffer[N * N];
+unsigned int *Matrix<N, K>::buffer = new unsigned int[N * N];
 
 #endif

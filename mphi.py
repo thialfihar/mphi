@@ -13,7 +13,7 @@ def factor(n):
 
 def phi_n(n, k):
     factors = factor(k)
-    print factors
+    #print factors
     result = 1
     for i in range(n):
         for (p, e) in factors:
@@ -59,6 +59,15 @@ def divisors(n):
         yield product(combination)
 
 
-for k in range(2, 10):
-    for n in range(2, 10):
-        print "lambda(n=%d, k=%d) = %s" % (n, k, lambda_n(n, k))
+def lambdas():
+    for k in range(2, 10):
+        for n in range(2, 10):
+            print "lambda(n=%d, k=%d) = %s" % (n, k, lambda_n(n, k))
+
+def phis():
+    for k in range(2, 10):
+        for n in range(2, 10):
+            print "phi(n=%d, k=%d) = %s" % (n, k, phi_n(n, k))
+
+#phis()
+print phi_n(12, 5)
