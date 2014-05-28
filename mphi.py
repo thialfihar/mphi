@@ -13,7 +13,6 @@ def factor(n):
 
 def phi_n(n, k):
     factors = factor(k)
-    #print factors
     result = 1
     for i in range(n):
         for (p, e) in factors:
@@ -70,4 +69,6 @@ def phis():
             print "phi(n=%d, k=%d) = %s" % (n, k, phi_n(n, k))
 
 #phis()
-print phi_n(12, 5)
+phi = phi_n(15, 12)
+print phi
+print lambda_n(15, 12)

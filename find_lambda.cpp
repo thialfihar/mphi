@@ -3,8 +3,8 @@
 
 #include "Matrix.h"
 
-#define N 9
-#define K 3
+#define N 15
+#define K 12
 
 int main(int argc, char *argv[]) {
     srand(time(nullptr));
