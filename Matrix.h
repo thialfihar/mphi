@@ -122,9 +122,7 @@ class Matrix {
         return m[row * N + column];
     }
 
-    inline void mult(Matrix<N, K> &other, Matrix<N, K> &result) {
-        result.zero();
-
+    inline void mult(const Matrix<N, K> &other, Matrix<N, K> &result) {
         if (N == 1) {
             result.m[0] = (m[0] * other.m[0]) % K;
             return;
@@ -176,7 +174,7 @@ class Matrix {
         }
     }
 
-    inline void mult(Matrix<N, K> &other) {
+    inline void mult(const Matrix<N, K> &other) {
         if (N == 1) {
             buffer[0] = (m[0] * other.m[0]) % K;
             memcpy(m, buffer, sizeof(unsigned int) * N * N);
@@ -233,7 +231,7 @@ class Matrix {
         memcpy(m, buffer, sizeof(unsigned int) * N * N);
     }
 
-    void power(mpz_class e, Matrix<N, K> &result) {
+    void power(const mpz_class &e, Matrix<N, K> &result) {
         if (e == 0) {
             result.make_identity();
             return;

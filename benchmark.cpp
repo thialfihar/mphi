@@ -7,7 +7,7 @@
 
 #define MAX_MULTIPLICATIONS 1000000
 #define N 10
-#define K 6
+#define K 10
 
 float timediff(clock_t t1, clock_t t2) {
     return (float) (t2 - t1) / CLOCKS_PER_SEC;
@@ -67,6 +67,51 @@ int main(int argc, char *argv[]) {
     t1 += noise_t;
     dt = timediff(t1, t2);
     printf("Matrix(%d, %d) mult x %d: %.3f (%.3f m/s)\n", N, K, MAX_MULTIPLICATIONS, dt, MAX_MULTIPLICATIONS / dt);
+
+    printf("\n");
+
+    t1 = clock();
+    noise_t = 0;
+    for (unsigned int i = 0; i < MAX_MULTIPLICATIONS; ++i) {
+        m1.mult(m2);
+    }
+    t2 = clock();
+    t1 += noise_t;
+    dt = timediff(t1, t2);
+    printf("Matrix<%d>(%d) mult in place x %d: %.3f (%.3f m/s)\n", N, K, MAX_MULTIPLICATIONS, dt, MAX_MULTIPLICATIONS / dt);
+
+    t1 = clock();
+    noise_t = 0;
+    for (unsigned int i = 0; i < MAX_MULTIPLICATIONS; ++i) {
+        gm1.mult(gm2);
+    }
+    t2 = clock();
+    t1 += noise_t;
+    dt = timediff(t1, t2);
+    printf("Matrix(%d, %d) mult in place x %d: %.3f (%.3f m/s)\n", N, K, MAX_MULTIPLICATIONS, dt, MAX_MULTIPLICATIONS / dt);
+
+    printf("\n");
+
+    t1 = clock();
+    noise_t = 0;
+    unsigned int e = 100000;
+    for (unsigned int i = 0; i < MAX_MULTIPLICATIONS; ++i) {
+        m1.power(e, result);
+    }
+    t2 = clock();
+    t1 += noise_t;
+    dt = timediff(t1, t2);
+    printf("Matrix<%d>(%d) power x %d: %.3f (%.3f p/s)\n", N, K, MAX_MULTIPLICATIONS, dt, MAX_MULTIPLICATIONS / dt);
+
+    t1 = clock();
+    noise_t = 0;
+    for (unsigned int i = 0; i < MAX_MULTIPLICATIONS; ++i) {
+        gm1.power(e, gresult);
+    }
+    t2 = clock();
+    t1 += noise_t;
+    dt = timediff(t1, t2);
+    printf("Matrix(%d, %d) power x %d: %.3f (%.3f p/s)\n", N, K, MAX_MULTIPLICATIONS, dt, MAX_MULTIPLICATIONS / dt);
 
 
     return 0;
