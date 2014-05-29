@@ -10,6 +10,8 @@
 
 #include "functions.h"
 
+//#define DEBUG
+
 template <unsigned int N, unsigned int K>
 class Matrix {
  public:
@@ -33,7 +35,7 @@ class Matrix {
 
     inline void randomize() {
         for (unsigned int i = 0; i < N * N; ++i) {
-            m[i] = ((unsigned int) rand() % (K * 1000000)) / 1000000;
+            m[i] = ((unsigned int) rand() % (2 * 1000000)) / 1000000;
         }
     }
 
@@ -146,6 +148,9 @@ class Matrix {
                 result.at(r, c) = sum % K;
             }
         }
+#ifdef DEBUG
+        ++num_multiplications;
+#endif
     }
 
     inline void mult(const Matrix<N, K> &other) {
@@ -162,6 +167,9 @@ class Matrix {
         unsigned int *tmp = buffer;
         buffer = m;
         m = tmp;
+#ifdef DEBUG
+        ++num_multiplications;
+#endif
     }
 
     inline void square() {
@@ -178,6 +186,9 @@ class Matrix {
         unsigned int *tmp = buffer;
         buffer = m;
         m = tmp;
+#ifdef DEBUG
+        ++num_multiplications;
+#endif
     }
 
     void power(const mpz_class &e, Matrix<N, K> &result) const {
@@ -210,21 +221,30 @@ class Matrix {
         }
     }
 
-    mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors) {
+    mpz_class get_minimal_exponent(const mpz_class &phi, Factors &factors) {
         mpz_class exponent = phi;
         Matrix<N, K> tmp;
+        Factors new_factors = factors;
+
         for (unsigned int i = 0; i < factors.size(); ++i) {
+            new_factors[i].second = 0;
             mpz_class e = exponent;
-            for (unsigned int j = 0; j < factors[i].second; ++j) {
+            // this could use a binary search to reduce this to ~log_2(factors[i].second) powers,
+            // but with the relatively small numbers there really isn't much point,
+            // it could be useful for calculating this for specific large matrices
+            while (factors[i].second > 0) {
                 e /= factors[i].first;
                 power(e, tmp);
                 if (!tmp.is_identity()) {
                     break;
                 }
                 exponent = e;
+                --factors[i].second;
+                ++new_factors[i].second;
             }
         }
 
+        factors = new_factors;
         return exponent;
     }
 
@@ -233,36 +253,23 @@ class Matrix {
         Factors factors = factorize(phi);
         bool check_all = false;
         mpz_class result = 1;
-        if (phi < 2000000) {
+        if (phi < 5000000) {
             check_all = true;
         }
+        //check_all = true;
         Matrix<N, K> m;
         m.zero();
-        unsigned int c = 0;
         unsigned int z = 0;
         unsigned int s = 0;
-        unsigned int max_c = 100000;
-        Matrix<N, K> tmp, tmp2;
-
-        vector<mpz_class> candidates;
-        while (result == 1) {
-            m.randomize();
-            m.power(phi, tmp);
-            if (tmp.is_zero()) {
-                continue;
-            } else if (!tmp.is_identity()) {
-                // singular matrix, ignore
-                continue;
+        unsigned int tries = 0;
+        mpz_class c, max_c = 100000, ctmp;
+        if (check_all) {
+            max_c = 1;
+            for (unsigned int i = 0; i < N * N; ++i) {
+                max_c *= K;
             }
-            result = m.get_minimal_exponent(phi, factors);
         }
-        candidates = get_divisors(12);
-        mpz_class ergh = phi / result;
-        printf("%s\n", ergh.get_str().c_str());
-        printf("phi = %s, first = %s, last = %s\n", phi.get_str().c_str(), candidates[0].get_str().c_str(), candidates[candidates.size() - 1].get_str().c_str());
-        candidates.erase(candidates.begin());
-        candidates.pop_back();
-        return 0;
+        Matrix<N, K> tmp, tmp2;
 
         while (true) {
             if (check_all) {
@@ -274,6 +281,11 @@ class Matrix {
                     break;
                 }
                 m.randomize();
+            }
+            ++tries;
+            if (tries % 10000 == 0) {
+                ctmp = 10000 * c / max_c;
+                printf("%.f%% c:%s, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c.get_str().c_str(), z, s);
             }
 
             //printf("%d %d\n", c, z);
@@ -292,57 +304,34 @@ class Matrix {
             m.power(result, tmp);
             if (tmp.is_identity()) {
                 ++c;
-                if (c % 100000 == 0) {
-                    printf("%.f%% c:%d, z:%d, s:%d\n", 100.0 * c / max_c, c, z, s);
-                }
                 continue;
             }
 
-            int ugh = 0;
-            if (result == 1) {
-                e = m.get_minimal_exponent(phi, factors);
-            } else {
-                for (unsigned int i = 0; i < candidates.size(); ++i) {
-                    tmp.power(candidates[i], tmp2);
-                    if (tmp2.is_zero()) {
-                        ++z;
-                        e = 1;
-                        ugh = -1;
-                        //printf("break at %d\n", i);
-                        break;
-                    } else if (tmp2.is_identity()) {
-                        e = candidates[i];
-                        ++c;
-                        if (c % 100000 == 0) {
-                            printf("%.f%% c:%d, z:%d, s:%d\n", 100.0 * c / max_c, c, z, s);
-                        }
-                        ugh = 1;
-                        break;
-                    }
-                }
+            /*for (unsigned int i = 0; i < factors.size(); ++i) {
+                printf("%s^%d, ", factors[i].first.get_str().c_str(), factors[i].second);
             }
-            if (ugh == 0) {
-                printf("wtf?\n");
-                m.print();
+            printf("\n");*/
+            e = tmp.get_minimal_exponent(phi / result, factors);
+            /*for (unsigned int i = 0; i < factors.size(); ++i) {
+                printf("%s^%d, ", factors[i].first.get_str().c_str(), factors[i].second);
             }
-            if (e > 1) {
-                //mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), e.get_mpz_t());
-                result *= e;
-                vector<mpz_class> new_candidates;
-                new_candidates.reserve(candidates.size());
-                for (unsigned int i = 0; i < candidates.size(); ++i) {
-                    if (candidates[i] % e == 0) {
-                        new_candidates.push_back(candidates[i] / e);
-                    }
-                }
-                candidates = new_candidates;
-                printf("%s\n", result.get_str().c_str());
-                printf("rest: %d, %.2f%% c:%d, z:%d, s:%d\n", (unsigned int) candidates.size(), 100.0 * c / max_c, c, z, s);
+            printf("\n");*/
+            ++c;
+            result *= e;
+            printf("%s\n", result.get_str().c_str());
+            unsigned int prime_factors = 0;
+            for (unsigned int i = 0; i < factors.size(); ++i) {
+                prime_factors += factors[i].second;
             }
+            printf("rest: %d\n", prime_factors);
         }
 
         return result;
     }
+
+#ifdef DEBUG
+    static unsigned long int num_multiplications;
+#endif
 
  private:
     unsigned int *m;
@@ -351,5 +340,10 @@ class Matrix {
 
 template <unsigned int N, unsigned int K>
 unsigned int *Matrix<N, K>::buffer = new unsigned int[N * N];
+
+#ifdef DEBUG
+template <unsigned int N, unsigned int K>
+unsigned long int Matrix<N, K>::num_multiplications = 0;
+#endif
 
 #endif
