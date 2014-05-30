@@ -10,12 +10,36 @@
 #define N 10
 #define K 10
 
+#define Ne 16
+#define Ke 15
+
 float timediff(clock_t t1, clock_t t2) {
     return (float) (t2 - t1) / CLOCKS_PER_SEC;
 }
 
+void test_minimal_exponent_search() {
+    srand(2107);
+    Matrix<Ne, Ke> mt, tmp;
+    mt.randomize();
+    mpz_class phi = phi_n(Ne, Ke);
+    Factors factors = factorize(phi);
+    do {
+        mt.power(phi, tmp);
+    } while (!tmp.is_identity());
+    Matrix<Ne, Ke>::num_multiplications = 0;
+    clock_t t1 = clock();
+    mpz_class exp = mt.get_minimal_exponent(phi, factors);
+    clock_t t2 = clock();
+    float dt = timediff(t1, t2);
+    printf("%s\n", exp.get_str().c_str());
+    printf("Matrix<%d, %d> get min exp %.3f %lu mults\n", Ne, Ke, dt, Matrix<Ne, Ke>::num_multiplications);
+}
+
 int main(int argc, char *argv[]) {
     srand(2107);
+
+    test_minimal_exponent_search();
+    return 0;
 
     Matrix<N, K> m1, m2, result;
     m1.randomize();
@@ -95,7 +119,6 @@ int main(int argc, char *argv[]) {
     t1 += noise_t;
     dt = timediff(t1, t2);
     printf("Matrix(%d, %d) power x %d: %.3f (%.3f p/s)\n", N, K, MAX_POWERS, dt, MAX_POWERS / dt);
-
 
     return 0;
 }

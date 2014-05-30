@@ -1,17 +1,33 @@
 #include <cstdio>
 #include <cstring>
+#include <boost/preprocessor/repetition/repeat.hpp>
 
 #include "Matrix.h"
 
-#define N 7
-#define K 7
+#define MIN_N 2
+#define NUM_N 9
+#define MIN_K 2
+#define NUM_K 7
+
+#define NEXT_N(z, N, K) else if (n == MIN_N + N && k == MIN_K + K) { result = Matrix<MIN_N + N, MIN_K + K>::find_probable_lambda(); }
+#define NEXT_K(z, K, data) BOOST_PP_REPEAT_2(NUM_N, NEXT_N, K)
+
+using std::get;
 
 int main(int argc, char *argv[]) {
     srand(time(nullptr));
     //test_stuff(); return 0;
 
-    mpz_class lambda = Matrix<N, K>::find_probable_lambda();
-    printf("lambda(n=%d, k=%d) = %s\n", N, K, lambda.get_str().c_str());
-    //printf("num multiplications: %lu\n", Matrix<N, K>::num_multiplications);
+    for (unsigned int k = MIN_K; k < MIN_K + NUM_K; ++k) {
+        for (unsigned int n = MIN_N; n < MIN_N + NUM_N; ++n) {
+            LambdaResult result;
+            if (false) {
+                // ...
+            }
+            BOOST_PP_REPEAT_1(NUM_K, NEXT_K, 0);
+            printf("lambda(n=%d, k=%d) = %s [%d:%s]\n",
+                n, k, get<0>(result).get_str().c_str(), get<1>(result), get<2>(result).get_str().c_str());
+        }
+    }
     return 0;
 }

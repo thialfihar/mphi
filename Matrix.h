@@ -10,7 +10,9 @@
 
 #include "functions.h"
 
-//#define DEBUG
+#define DEBUG
+
+typedef std::tuple<mpz_class, unsigned int, mpz_class> LambdaResult;
 
 template <unsigned int N, unsigned int K>
 class Matrix {
@@ -221,6 +223,8 @@ class Matrix {
         }
     }
 
+    //unsigned int search_for_prime_exponent(
+
     mpz_class get_minimal_exponent(const mpz_class &phi, Factors &factors) {
         mpz_class exponent = phi;
         Matrix<N, K> tmp;
@@ -248,29 +252,28 @@ class Matrix {
         return exponent;
     }
 
-    static mpz_class find_probable_lambda() {
+    static LambdaResult find_probable_lambda() {
         mpz_class phi = phi_n(N, K);
         Factors factors = factorize(phi);
-        bool check_all = false;
+        mpz_class num_matrices = 1;
+        for (unsigned int i = 0; i < N * N; ++i) {
+            num_matrices *= K;
+        }
         mpz_class result = 1;
-        if (phi < 5000000) {
+        bool check_all = false;
+        if (phi < 50000000) {
             check_all = true;
         }
-        //check_all = true;
         Matrix<N, K> m;
         m.zero();
         unsigned int z = 0;
         unsigned int s = 0;
-        unsigned int tries = 0;
-        mpz_class c, max_c = 100000, ctmp;
+        mpz_class c, max_c = 200000, ctmp;
         if (check_all) {
-            max_c = 1;
-            for (unsigned int i = 0; i < N * N; ++i) {
-                max_c *= K;
-            }
+            max_c = phi;
         }
         Matrix<N, K> tmp, tmp2;
-
+        unsigned int last_timestamp = time(NULL);
         while (true) {
             if (check_all) {
                 if (!m.next()) {
@@ -282,10 +285,10 @@ class Matrix {
                 }
                 m.randomize();
             }
-            ++tries;
-            if (tries % 10000 == 0) {
+            if (time(NULL) >= last_timestamp + 5) {
                 ctmp = 10000 * c / max_c;
                 printf("%.f%% c:%s, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c.get_str().c_str(), z, s);
+                last_timestamp = time(NULL);
             }
 
             //printf("%d %d\n", c, z);
@@ -326,7 +329,13 @@ class Matrix {
             printf("rest: %d\n", prime_factors);
         }
 
-        return result;
+        unsigned int confidence;
+        if (check_all) {
+            confidence = 0;
+        } else {
+            confidence = c.get_ui();
+        }
+        return LambdaResult(result, confidence, num_matrices);
     }
 
 #ifdef DEBUG
