@@ -10,12 +10,12 @@ Factors factorize(mpz_class n) {
             n /= p;
         }
         if (e > 0) {
-            result.push_back(Factor(p, e));
+            result.push_back({p, e});
         }
         mpz_nextprime(p.get_mpz_t(), p.get_mpz_t());
     }
     if (n != 1) {
-        result.push_back(Factor(n, 1));
+        result.push_back({n, 1});
     }
     return result;
 }
@@ -26,9 +26,9 @@ vector<mpz_class> get_divisors(mpz_class n) {
     result.push_back(1);
     for (Factor f : factors) {
         auto tmp_results = result;
-        for (unsigned int i = 1; i <= f.second; ++i) {
+        for (unsigned int i = 1; i <= f.exponent; ++i) {
             mpz_class tmp;
-            mpz_pow_ui(tmp.get_mpz_t(), f.first.get_mpz_t(), i);
+            mpz_pow_ui(tmp.get_mpz_t(), f.prime.get_mpz_t(), i);
             for (auto v : tmp_results) {
                 result.push_back(tmp * v);
             }
@@ -45,8 +45,8 @@ mpz_class phi_n(unsigned int n, unsigned int k) {
     for (unsigned int i = 1; i <= n; ++i) {
         for (Factor f : factors) {
             mpz_class tmp1, tmp2;
-            mpz_pow_ui(tmp1.get_mpz_t(), f.first.get_mpz_t(), f.second * n);
-            mpz_pow_ui(tmp2.get_mpz_t(), f.first.get_mpz_t(), f.second * n - i);
+            mpz_pow_ui(tmp1.get_mpz_t(), f.prime.get_mpz_t(), f.exponent * n);
+            mpz_pow_ui(tmp2.get_mpz_t(), f.prime.get_mpz_t(), f.exponent * n - i);
             result *= tmp1 - tmp2;
         }
     }

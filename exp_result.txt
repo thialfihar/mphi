@@ -1,0 +1,18 @@
+66711425770320
+Matrix<16, 15> get min exp 1.986 406656 mults
+./benchmark  15,99s user 0,01s system 99% cpu 16,017 total
+
+with search_for_prime_exponent:
+66711425770320
+Matrix<16, 15> get min exp 0.067 13714 mults
+./benchmark  13,93s user 0,01s system 99% cpu 13,947 total
+
+sorting factors by exponent alone:
+66711425770320
+Matrix<16, 15> get min exp 0.051 10366 mults
+./benchmark  13,95s user 0,01s system 99% cpu 13,967 tota
+
+sorting by p^e:
+6711425770320
+Matrix<16, 15> get min exp 0.049 9897 mults
+./benchmark  14,10s user 0,01s system 99% cpu 14,120 total

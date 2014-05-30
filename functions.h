@@ -10,7 +10,10 @@
 using std::pair;
 using std::vector;
 
-typedef pair<mpz_class, unsigned int> Factor;
+typedef struct {
+    mpz_class prime;
+    unsigned int exponent;
+} Factor;
 typedef vector<Factor> Factors;
 
 Factors factorize(mpz_class n);

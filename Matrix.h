@@ -14,6 +14,13 @@
 
 typedef std::tuple<mpz_class, unsigned int, mpz_class> LambdaResult;
 
+bool cmp_factors(const Factor &a, const Factor &b) {
+    mpz_class t1, t2;
+    mpz_pow_ui(t1.get_mpz_t(), a.prime.get_mpz_t(), a.exponent);
+    mpz_pow_ui(t2.get_mpz_t(), b.prime.get_mpz_t(), b.exponent);
+    return t1 > t2;
+}
+
 template <unsigned int N, unsigned int K>
 class Matrix {
  public:
@@ -223,38 +230,56 @@ class Matrix {
         }
     }
 
-    //unsigned int search_for_prime_exponent(
+    static unsigned int search_for_prime_exponent(const Matrix<N, K> &base, const Factor &factor) {
+        Matrix<N, K> tmp;
+        unsigned int result = 0;
+        mpz_class exp = 1;
+        if (base.is_identity()) {
+            return 0;
+        }
+        // this could be done with binary search, but in practice it seems like exp is usually low,
+        // so naively searching from the start seems to be the fastest way
+        for (unsigned int i = 0; i < factor.exponent; ++i) {
+            exp *= factor.prime;
+            ++result;
+            base.power(exp, tmp);
+            if (tmp.is_identity()) {
+                return result;
+            }
+        }
+        return result;
+    }
 
-    mpz_class get_minimal_exponent(const mpz_class &phi, Factors &factors) {
+    mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors, Factors *left_factors) {
         mpz_class exponent = phi;
         Matrix<N, K> tmp;
         Factors new_factors = factors;
 
         for (unsigned int i = 0; i < factors.size(); ++i) {
-            new_factors[i].second = 0;
-            mpz_class e = exponent;
-            // this could use a binary search to reduce this to ~log_2(factors[i].second) powers,
-            // but with the relatively small numbers there really isn't much point,
-            // it could be useful for calculating this for specific large matrices
-            while (factors[i].second > 0) {
-                e /= factors[i].first;
-                power(e, tmp);
-                if (!tmp.is_identity()) {
-                    break;
-                }
-                exponent = e;
-                --factors[i].second;
-                ++new_factors[i].second;
+            for (unsigned int j = 0; j < factors[i].exponent; ++j) {
+                exponent /= factors[i].prime;
+            }
+            power(exponent, tmp);
+            unsigned int exp = search_for_prime_exponent(tmp, factors[i]);
+            //printf("%s : %d : %d\n", factors[i].prime.get_str().c_str(), factors[i].exponent, exp);
+            new_factors[i].exponent -= exp;
+            for (unsigned int j = 0; j < exp; ++j) {
+                exponent *= factors[i].prime;
             }
         }
 
-        factors = new_factors;
+        if (left_factors) {
+            *left_factors = new_factors;
+        }
         return exponent;
     }
 
     static LambdaResult find_probable_lambda() {
         mpz_class phi = phi_n(N, K);
         Factors factors = factorize(phi);
+        // go backwards, so large factors are removed early on
+        sort(factors.begin(), factors.end(), cmp_factors);
+
         mpz_class num_matrices = 1;
         for (unsigned int i = 0; i < N * N; ++i) {
             num_matrices *= K;
@@ -311,12 +336,12 @@ class Matrix {
             }
 
             /*for (unsigned int i = 0; i < factors.size(); ++i) {
-                printf("%s^%d, ", factors[i].first.get_str().c_str(), factors[i].second);
+                printf("%s^%d, ", factors[i].prime.get_str().c_str(), factors[i].exponent);
             }
             printf("\n");*/
-            e = tmp.get_minimal_exponent(phi / result, factors);
+            e = tmp.get_minimal_exponent(phi / result, factors, &factors);
             /*for (unsigned int i = 0; i < factors.size(); ++i) {
-                printf("%s^%d, ", factors[i].first.get_str().c_str(), factors[i].second);
+                printf("%s^%d, ", factors[i].prime.get_str().c_str(), factors[i].exponent);
             }
             printf("\n");*/
             ++c;
@@ -324,7 +349,7 @@ class Matrix {
             printf("%s\n", result.get_str().c_str());
             unsigned int prime_factors = 0;
             for (unsigned int i = 0; i < factors.size(); ++i) {
-                prime_factors += factors[i].second;
+                prime_factors += factors[i].exponent;
             }
             printf("rest: %d\n", prime_factors);
         }

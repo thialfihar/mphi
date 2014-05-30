@@ -5,7 +5,7 @@
 #include "Matrix.h"
 
 #define MIN_N 2
-#define NUM_N 9
+#define NUM_N 7
 #define MIN_K 2
 #define NUM_K 7
 

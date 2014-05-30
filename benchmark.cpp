@@ -23,12 +23,14 @@ void test_minimal_exponent_search() {
     mt.randomize();
     mpz_class phi = phi_n(Ne, Ke);
     Factors factors = factorize(phi);
+    // go backwards, so large factors are removed early on
+    sort(factors.begin(), factors.end(), cmp_factors);
     do {
         mt.power(phi, tmp);
     } while (!tmp.is_identity());
     Matrix<Ne, Ke>::num_multiplications = 0;
     clock_t t1 = clock();
-    mpz_class exp = mt.get_minimal_exponent(phi, factors);
+    mpz_class exp = mt.get_minimal_exponent(phi, factors, nullptr);
     clock_t t2 = clock();
     float dt = timediff(t1, t2);
     printf("%s\n", exp.get_str().c_str());
