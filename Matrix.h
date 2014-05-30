@@ -12,7 +12,11 @@
 
 #define DEBUG
 
-typedef std::tuple<mpz_class, unsigned int, mpz_class> LambdaResult;
+typedef struct {
+    mpz_class lambda;
+    unsigned int confidence;
+    mpz_class phi;
+} LambdaResult;
 
 bool cmp_factors(const Factor &a, const Factor &b) {
     mpz_class t1, t2;
@@ -360,7 +364,7 @@ class Matrix {
         } else {
             confidence = c.get_ui();
         }
-        return LambdaResult(result, confidence, num_matrices);
+        return {result, confidence, num_matrices};
     }
 
 #ifdef DEBUG
