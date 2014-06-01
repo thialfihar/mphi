@@ -28,13 +28,17 @@ void test_minimal_exponent_search() {
     do {
         mt.power(phi, tmp);
     } while (!tmp.is_identity());
+#ifdef DEBUG
     Matrix<Ne, Ke>::num_multiplications = 0;
+#endif
     clock_t t1 = clock();
     mpz_class exp = mt.get_minimal_exponent(phi, factors, nullptr);
     clock_t t2 = clock();
     float dt = timediff(t1, t2);
     printf("%s\n", exp.get_str().c_str());
+#ifdef DEBUG
     printf("Matrix<%d, %d> get min exp %.3f %lu mults\n", Ne, Ke, dt, Matrix<Ne, Ke>::num_multiplications);
+#endif
 }
 
 int main(int argc, char *argv[]) {

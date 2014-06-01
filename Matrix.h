@@ -1,22 +1,35 @@
 #ifndef __MATRIX_H__
 #define __MATRIX_H__
+#include <assert.h>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
 
 #include <algorithm>
+#include <map>
 #include <vector>
 #include <gmpxx.h>
 
 #include "functions.h"
 
-#define DEBUG
+//#define DEBUG
 
 typedef struct {
     mpz_class lambda;
     unsigned int confidence;
     mpz_class phi;
 } LambdaResult;
+
+typedef std::map<mpz_class, mpz_class> ExponentMap;
+typedef vector<mpz_class> Cycle;
+
+typedef struct {
+    ExponentMap map;
+    ExponentMap permutation_map;
+    unsigned int confidence;
+    mpz_class phi;
+    vector<Cycle> cycles;
+} ExponentMapResult;
 
 bool cmp_factors(const Factor &a, const Factor &b) {
     mpz_class t1, t2;
@@ -30,6 +43,11 @@ class Matrix {
  public:
     inline Matrix() {
         m = new unsigned int[N * N];
+    }
+
+    inline Matrix(const Matrix<N, K> &other)
+        :Matrix() {
+        *this = other;
     }
 
     inline ~Matrix() {
@@ -143,6 +161,26 @@ class Matrix {
         return true;
     }
 
+    inline bool is_permutation_matrix() const {
+        for (unsigned int r = 0; r < N; ++r) {
+            unsigned int ones = 0;
+            unsigned int zeros = 0;
+            for (unsigned int c = 0; c < N; ++c) {
+                unsigned int value = at(r, c);
+                if (value == 1) {
+                    ++ones;
+                } else if (value == 0) {
+                    ++zeros;
+                }
+            }
+
+            if (ones != 1 || zeros != N - 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     inline unsigned int &at(unsigned int row, unsigned int column) {
         return m[row * N + column];
     }
@@ -234,6 +272,33 @@ class Matrix {
         }
     }
 
+    mpz_class get_id() const {
+        mpz_class id = 0;
+        for (unsigned int i = 0; i < N * N; ++i) {
+            unsigned int j = N * N - 1 - i;
+            id *= K;
+            id += m[j];
+        }
+        return id;
+    }
+
+    Cycle get_cycle(const mpz_class &size) const {
+        Cycle cycle;
+        assert(size.fits_uint_p());
+        if (size != 0) {
+            cycle.reserve(size.get_ui());
+        }
+        Matrix<N, K> tmp = *this;
+        tmp.print();
+        while (!tmp.is_identity()) {
+            cycle.push_back(tmp.get_id());
+            tmp.mult(*this);
+        }
+        cycle.push_back(tmp.get_id());
+
+        return cycle;
+    }
+
     static unsigned int search_for_prime_exponent(const Matrix<N, K> &base, const Factor &factor) {
         Matrix<N, K> tmp;
         unsigned int result = 0;
@@ -257,7 +322,10 @@ class Matrix {
     mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors, Factors *left_factors) {
         mpz_class exponent = phi;
         Matrix<N, K> tmp;
-        Factors new_factors = factors;
+        Factors new_factors;
+        if (left_factors) {
+            new_factors = factors;
+        }
 
         for (unsigned int i = 0; i < factors.size(); ++i) {
             for (unsigned int j = 0; j < factors[i].exponent; ++j) {
@@ -266,7 +334,9 @@ class Matrix {
             power(exponent, tmp);
             unsigned int exp = search_for_prime_exponent(tmp, factors[i]);
             //printf("%s : %d : %d\n", factors[i].prime.get_str().c_str(), factors[i].exponent, exp);
-            new_factors[i].exponent -= exp;
+            if (left_factors) {
+                new_factors[i].exponent -= exp;
+            }
             for (unsigned int j = 0; j < exp; ++j) {
                 exponent *= factors[i].prime;
             }
@@ -364,7 +434,88 @@ class Matrix {
         } else {
             confidence = c.get_ui();
         }
-        return {result, confidence, num_matrices};
+        return {result, confidence, phi};
+    }
+
+    static ExponentMapResult get_exponent_map() {
+        mpz_class phi = phi_n(N, K);
+        Factors factors = factorize(phi);
+        // go backwards, so large factors are removed early on
+        sort(factors.begin(), factors.end(), cmp_factors);
+        ExponentMap result;
+        ExponentMap permutation_map;
+        vector<Cycle> cycles;
+
+        mpz_class num_matrices = 1;
+        for (unsigned int i = 0; i < N * N; ++i) {
+            num_matrices *= K;
+        }
+        bool check_all = false;
+        if (phi < 50000000) {
+            check_all = true;
+        }
+        Matrix<N, K> m;
+        m.zero();
+        unsigned int z = 0;
+        unsigned int s = 0;
+        mpz_class c = 0, max_c = 200000, ctmp;
+        if (check_all) {
+            max_c = phi;
+        }
+        cycles.reserve(max_c.get_ui());
+        Matrix<N, K> tmp, tmp2;
+        unsigned int last_timestamp = time(NULL);
+        while (true) {
+            if (check_all) {
+                if (!m.next()) {
+                    break;
+                }
+            } else {
+                if (c >= max_c) {
+                    break;
+                }
+                m.randomize();
+            }
+            if (time(NULL) >= last_timestamp + 5) {
+                ctmp = 10000 * c / max_c;
+                printf("%.f%% c:%s, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c.get_str().c_str(), z, s);
+                last_timestamp = time(NULL);
+            }
+
+            m.power(phi, tmp);
+            if (tmp.is_zero()) {
+                ++z;
+                continue;
+            } else if (!tmp.is_identity()) {
+                ++s;
+                // singular matrix, ignore
+                continue;
+            }
+
+            ++c;
+            mpz_class e = m.get_minimal_exponent(phi, factors, nullptr);
+            auto it = result.find(e);
+            if (it == result.end()) {
+                result[e] = 1;
+                if (m.is_permutation_matrix()) {
+                    permutation_map[e] = 1;
+                }
+            } else {
+                ++it->second;
+                if (m.is_permutation_matrix()) {
+                    ++permutation_map[e];
+                }
+            }
+            cycles.push_back(m.get_cycle(e));
+        }
+
+        unsigned int confidence;
+        if (check_all) {
+            confidence = 0;
+        } else {
+            confidence = c.get_ui();
+        }
+        return {result, permutation_map, confidence, phi, cycles};
     }
 
 #ifdef DEBUG

@@ -5,9 +5,9 @@
 #include "Matrix.h"
 
 #define MIN_N 2
-#define NUM_N 7
+#define NUM_N 1
 #define MIN_K 2
-#define NUM_K 7
+#define NUM_K 1
 
 #define NEXT_N(z, N, K) else if (n == MIN_N + N && k == MIN_K + K) { result = Matrix<MIN_N + N, MIN_K + K>::find_probable_lambda(); }
 #define NEXT_K(z, K, data) BOOST_PP_REPEAT_2(NUM_N, NEXT_N, K)
