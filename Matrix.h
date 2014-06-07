@@ -13,6 +13,7 @@
 #include <gmpxx.h>
 
 #include "functions.h"
+#include "Mutex.h"
 
 //#define DEBUG
 
@@ -441,45 +442,63 @@ class Matrix {
 #endif
     }
 
-    inline void mult(const Matrix<N, K> &other) {
+    inline void mult(const Matrix<N, K> &other, unsigned int **external_buffer) {
+        unsigned int *buffer_used = buffer;
+        if (external_buffer) {
+            buffer_used = *external_buffer;
+        }
         for (unsigned int r = 0; r < N; ++r) {
             for (unsigned int c = 0; c < N; ++c) {
                 unsigned int sum = 0;
                 for (unsigned int i = 0; i < N; ++i) {
                     sum += at(r, i) * other.at(i, c);
                 }
-                buffer[r * N + c] = sum % K;
+                buffer_used[r * N + c] = sum % K;
             }
         }
-        //memcpy(m, buffer, sizeof(unsigned int) * N * N);
-        unsigned int *tmp = buffer;
-        buffer = m;
-        m = tmp;
+        if (external_buffer) {
+            unsigned int *tmp = *external_buffer;
+            *external_buffer = m;
+            m = tmp;
+        } else {
+            unsigned int *tmp = buffer;
+            buffer = m;
+            m = tmp;
+        }
 #ifdef DEBUG
         ++num_multiplications;
 #endif
     }
 
-    inline void square() {
+    inline void square(unsigned int **external_buffer) {
+        unsigned int *buffer_used = buffer;
+        if (external_buffer) {
+            buffer_used = *external_buffer;
+        }
         for (unsigned int r = 0; r < N; ++r) {
             for (unsigned int c = 0; c < N; ++c) {
                 unsigned int sum = 0;
                 for (unsigned int i = 0; i < N; ++i) {
                     sum += at(r, i) * at(i, c);
                 }
-                buffer[r * N + c] = sum % K;
+                buffer_used[r * N + c] = sum % K;
             }
         }
-        //memcpy(m, buffer, sizeof(unsigned int) * N * N);
-        unsigned int *tmp = buffer;
-        buffer = m;
-        m = tmp;
+        if (external_buffer) {
+            unsigned int *tmp = *external_buffer;
+            *external_buffer = m;
+            m = tmp;
+        } else {
+            unsigned int *tmp = buffer;
+            buffer = m;
+            m = tmp;
+        }
 #ifdef DEBUG
         ++num_multiplications;
 #endif
     }
 
-    void power(const mpz_class &e, Matrix<N, K> &result) const {
+    void power(const mpz_class &e, Matrix<N, K> &result, unsigned int **external_buffer) const {
         if (e == 0) {
             result.make_identity();
             return;
@@ -488,11 +507,10 @@ class Matrix {
             return;
         }
 
-        power(e / 2, result);
-        //result.mult(result);
-        result.square();
+        power(e / 2, result, external_buffer);
+        result.square(external_buffer);
         if (e % 2 == 1) {
-            result.mult(*this);
+            result.mult(*this, external_buffer);
         }
     }
 
@@ -519,7 +537,7 @@ class Matrix {
         return id;
     }
 
-    Cycle get_cycle(const mpz_class &size, set<mpz_class> &seen) const {
+    Cycle get_cycle(const mpz_class &size, set<mpz_class> &seen, unsigned int **external_buffer) const {
         Cycle cycle;
         assert(size.fits_uint_p());
         if (size != 0) {
@@ -530,14 +548,15 @@ class Matrix {
             mpz_class id = tmp.get_id();
             seen.insert(id);
             cycle.push_back(id);
-            tmp.mult(*this);
+            tmp.mult(*this, external_buffer);
         }
         cycle.push_back(tmp.get_id());
 
         return cycle;
     }
 
-    static unsigned int search_for_prime_exponent(const Matrix<N, K> &base, const Factor &factor) {
+    static unsigned int search_for_prime_exponent(const Matrix<N, K> &base, const Factor &factor,
+        unsigned int **external_buffer) {
         Matrix<N, K> tmp;
         unsigned int result = 0;
         mpz_class exp = 1;
@@ -549,7 +568,7 @@ class Matrix {
         for (unsigned int i = 0; i < factor.exponent; ++i) {
             exp *= factor.prime;
             ++result;
-            base.power(exp, tmp);
+            base.power(exp, tmp, external_buffer);
             if (tmp.is_identity()) {
                 return result;
             }
@@ -557,7 +576,8 @@ class Matrix {
         return result;
     }
 
-    mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors, Factors *left_factors) {
+    mpz_class get_minimal_exponent(const mpz_class &phi, const Factors &factors, Factors *left_factors,
+        unsigned int **external_buffer) {
         mpz_class exponent = phi;
         Matrix<N, K> tmp;
         Factors new_factors;
@@ -569,8 +589,8 @@ class Matrix {
             for (unsigned int j = 0; j < factors[i].exponent; ++j) {
                 exponent /= factors[i].prime;
             }
-            power(exponent, tmp);
-            unsigned int exp = search_for_prime_exponent(tmp, factors[i]);
+            power(exponent, tmp, external_buffer);
+            unsigned int exp = search_for_prime_exponent(tmp, factors[i], external_buffer);
             //printf("%s : %d : %d\n", factors[i].prime.get_str().c_str(), factors[i].exponent, exp);
             if (left_factors) {
                 new_factors[i].exponent -= exp;
@@ -596,96 +616,131 @@ class Matrix {
         for (unsigned int i = 0; i < N * N; ++i) {
             num_matrices *= K;
         }
-        mpz_class result = 1;
         bool check_all = false;
         if (phi < 50000000) {
             check_all = true;
         }
         unsigned int z = 0;
         unsigned int s = 0;
-        mpz_class c, max_c = 2000000, ctmp;
+        unsigned int c = 0;
+        mpz_class max_c = 2000000, ctmp;
         if (check_all) {
             max_c = phi;
         }
-        Matrix<N, K> tmp, tmp2;
         unsigned int last_timestamp = time(NULL);
-        const Matrix<N, K> *m;
-        Matrix<N, K> base;
-        MatrixIterator *it;
-        if (check_all) {
-            //it = new GeneralIterator();
-            it = new NonsingularIterator(true);
-        } else {
-            it = new RandomIterator(1000000000);
-        }
-        while (true) {
-            if (it->is_done()) {
-                break;
-            }
-            it->next();
-            m = &it->matrix();
 
-            if (c > max_c) {
-                break;
-            }
+        bool goon = true;
+        Mutex lock_iterator;
+        Mutex lock_result;
+        mpz_class result = 1;
+        bool result_changed = false;
 
-            if (time(NULL) >= last_timestamp + 5) {
-                ctmp = 10000 * c / max_c;
-                printf("%.f%% c:%s, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c.get_str().c_str(), z, s);
-                last_timestamp = time(NULL);
+        #pragma omp parallel firstprivate(factors)
+        {
+            MatrixIterator *it;
+            if (check_all) {
+                //it = new GeneralIterator();
+                it = new NonsingularIterator(true);
+            } else {
+                it = new RandomIterator(1000000000);
             }
-            /*++c;
-            if (c >= 20000000) {
-                m->print();
-            m->power(phi, tmp);
-            tmp.print();
-                break;
-            }
-            continue;*/
+            mpz_class local_result = 1;
+            Matrix<N, K> tmp, tmp2;
+            Matrix<N, K> m;
+            Matrix<N, K> base;
+            unsigned int *buffer = new unsigned int [N * N];
+            while (goon) {
+                //lock_iterator.lock();
+                goon = !it->is_done();
+                //lock_iterator.unlock();
+                if (!goon) {
+                    break;
+                }
+                //lock_iterator.lock();
+                it->next();
+                m = it->matrix();
+                //lock_iterator.unlock();
 
-            //printf("%d %d\n", c, z);
-            //m.print();
-            mpz_class e = 1;
-            m->power(phi, tmp);
-            if (tmp.is_zero()) {
-                ++z;
-                continue;
-            } else if (!tmp.is_identity()) {
-                ++s;
-                // singular matrix, ignore
-                continue;
-            }
+                if (c > max_c) {
+                    break;
+                }
 
-            m->power(result, tmp);
-            if (tmp.is_identity()) {
+                #pragma omp master
+                {
+                    if (time(NULL) >= last_timestamp + 5) {
+                        ctmp = 10000 * mpz_class(c) / max_c;
+                        printf("%.f%% c:%d, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c, z, s);
+                        last_timestamp = time(NULL);
+                    }
+
+                    lock_result.lock();
+                    if (result_changed) {
+                        printf("%s\n", result.get_str().c_str());
+                        result_changed = false;
+                    }
+                    lock_result.unlock();
+                }
+
+                mpz_class e = 1;
+                m.power(phi, tmp, &buffer);
+                if (tmp.is_zero()) {
+                    #pragma omp atomic
+                    ++z;
+                    continue;
+                } else if (!tmp.is_identity()) {
+                    #pragma omp atomic
+                    ++s;
+                    // singular matrix, ignore
+                    continue;
+                }
+
+                m.power(local_result, tmp, &buffer);
+                if (tmp.is_identity()) {
+                    #pragma omp atomic
+                    ++c;
+                    continue;
+                }
+
+                /*for (unsigned int i = 0; i < factors.size(); ++i) {
+                    printf("%s^%d, ", factors[i].prime.get_str().c_str(), factors[i].exponent);
+                }
+                printf("\n");*/
+                mpz_class rest;
+                rest = phi / local_result;
+                e = tmp.get_minimal_exponent(rest, factors, &factors, &buffer);
+                /*for (unsigned int i = 0; i < factors.size(); ++i) {
+                    printf("%s^%d, ", factors[i].prime.get_str().c_str(), factors[i].exponent);
+                }
+                printf("\n");*/
+                #pragma omp atomic
                 ++c;
-                continue;
+
+                if (e > 1) {
+                    lock_result.lock();
+                    local_result *= e;
+                    mpz_class old_result = result;
+                    mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), local_result.get_mpz_t());
+                    if (result != old_result) {
+                        result_changed = true;
+                    }
+                    lock_result.unlock();
+                }
+                /*unsigned int prime_factors = 0;
+                for (unsigned int i = 0; i < factors.size(); ++i) {
+                    prime_factors += factors[i].exponent;
+                }
+                printf("rest: %d\n", prime_factors);
+                */
             }
 
-            /*for (unsigned int i = 0; i < factors.size(); ++i) {
-                printf("%s^%d, ", factors[i].prime.get_str().c_str(), factors[i].exponent);
-            }
-            printf("\n");*/
-            e = tmp.get_minimal_exponent(phi / result, factors, &factors);
-            /*for (unsigned int i = 0; i < factors.size(); ++i) {
-                printf("%s^%d, ", factors[i].prime.get_str().c_str(), factors[i].exponent);
-            }
-            printf("\n");*/
-            ++c;
-            result *= e;
-            printf("%s\n", result.get_str().c_str());
-            unsigned int prime_factors = 0;
-            for (unsigned int i = 0; i < factors.size(); ++i) {
-                prime_factors += factors[i].exponent;
-            }
-            printf("rest: %d\n", prime_factors);
+            delete[] buffer;
         }
 
         unsigned int confidence;
         if (check_all) {
             confidence = 0;
         } else {
-            confidence = c.get_ui();
+            confidence = c;
         }
         return {result, confidence, phi};
     }
@@ -736,7 +791,7 @@ class Matrix {
                 last_timestamp = time(NULL);
             }
 
-            m.power(phi, tmp);
+            m.power(phi, tmp, nullptr);
             if (tmp.is_zero()) {
                 ++z;
                 continue;
@@ -747,7 +802,7 @@ class Matrix {
             }
 
             ++c;
-            mpz_class e = m.get_minimal_exponent(phi, factors, nullptr);
+            mpz_class e = m.get_minimal_exponent(phi, factors, nullptr, nullptr);
             auto it = result.find(e);
             if (it == result.end()) {
                 result[e] = 1;
@@ -763,7 +818,7 @@ class Matrix {
 
             mpz_class id = m.get_id();
             if (seen.find(id) == seen.end()) {
-                cycles.push_back(m.get_cycle(e, seen));
+                cycles.push_back(m.get_cycle(e, seen, nullptr));
             }
         }
 
