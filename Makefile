@@ -1,7 +1,7 @@
 CC=g++
 CPPFLAGS=-std=c++11 -Ofast
 
-all: benchmark find_lambda map
+all: find_lambda map
 
 functions.o: functions.cpp functions.h
 	$(CC) $(CPPFLAGS) -c -o functions.o functions.cpp

@@ -46,54 +46,69 @@ bool cmp_factors(const Factor &a, const Factor &b) {
 template <unsigned int N, unsigned int K>
 class Matrix {
  public:
-    class GeneralIterator : public std::iterator<std::input_iterator_tag, Matrix<N, K>> {
+    class MatrixIterator {
      public:
-        GeneralIterator() {
-            m.zero();
-            done = false;
+        MatrixIterator()
+            :done(false) {
         }
 
-        GeneralIterator(const GeneralIterator &o)
-            :m(o.m), done(o.done) {
-        }
+        virtual void next() = 0;
 
-        GeneralIterator &operator++() {
-            if (!m.next()) {
-                done = true;
-            }
-            return *this;
-        }
-
-        bool operator==(const GeneralIterator &o) {
-            return m == o.m;
-        }
-
-        bool operator!=(const GeneralIterator &o) {
-            return !(*this == o);
-        }
-
-        const Matrix &operator*() {
+        const Matrix &matrix() {
             return m;
-        }
-
-        const Matrix *operator&() {
-            return &m;
         }
 
         bool is_done() const {
             return done;
         }
 
-     private:
+     protected:
         Matrix<N, K> m;
         bool done;
     };
 
-    class NonsingularIterator : public std::iterator<std::input_iterator_tag, Matrix<N, K>> {
+    class GeneralIterator : public MatrixIterator {
+     public:
+        GeneralIterator() : MatrixIterator() {
+            MatrixIterator::m.zero();
+        }
+
+        virtual void next() {
+            if (!MatrixIterator::m.next()) {
+                MatrixIterator::done = true;
+            }
+        }
+    };
+
+    class RandomIterator : public MatrixIterator {
+     public:
+        RandomIterator(unsigned int size) : MatrixIterator(),
+            size(size) {
+        }
+
+        virtual void next() {
+            if (MatrixIterator::done) {
+                return;
+            }
+
+            MatrixIterator::m.randomize();
+            --size;
+            if (size == 0) {
+                MatrixIterator::done = true;
+            }
+        }
+
+     protected:
+        unsigned int size;
+    };
+
+
+    class NonsingularIterator : public MatrixIterator {
         typedef vector<unsigned int> Row;
 
      public:
-        NonsingularIterator() {
+        NonsingularIterator(bool non_permutating) : MatrixIterator(),
+            non_permutating(non_permutating) {
             Row row(N, 0);
             ruled_out_rows = vector<vector<unsigned int>>(N);
             unsigned int max_rows = 1;
@@ -149,11 +164,53 @@ class Matrix {
             for (unsigned int i = 0; i < N; ++i) {
                 state[i] = -1;
             }
-            done = false;
+            MatrixIterator::done = false;
         }
 
-        NonsingularIterator(const NonsingularIterator &o)
-            :m(o.m), done(o.done) {
+        virtual void next() {
+            if (!MatrixIterator::done) {
+                next_matrix(N - 1);
+            }
+        }
+
+     protected:
+        void next_matrix(unsigned int row_number) {
+            if (MatrixIterator::done) {
+                return;
+            }
+            if (row_number > 0 && state[row_number - 1] == -1) {
+                next_matrix(row_number - 1);
+            }
+
+            clear_ruled_out_rows(row_number);
+
+            if (non_permutating && state[row_number] == -1 && row_number > 0) {
+                state[row_number] = state[row_number - 1];
+                //printf("new: %d:%d %d:%d\n", row_number, state[row_number], row_number - 1, state[row_number - 1]);
+            }
+            for (int i = state[row_number] + 1; i < (int) base_rows.size(); ++i) {
+                //printf("hmm %d\n", i);
+                const unsigned int id = base_rows[i];
+                if (!acceptable_rows[id]) {
+                    continue;
+                }
+                const Row &row = all_rows[id];
+
+                state[row_number] = i;
+                memcpy(&MatrixIterator::m.m[row_number * N], row.data(), sizeof(unsigned int) * N);
+                if (row_number < N - 1) {
+                    rule_out_rows(row_number);
+                }
+                return;
+            }
+
+            if (row_number == 0) {
+                MatrixIterator::done = true;
+            } else {
+                state[row_number] = -1;
+                next_matrix(row_number - 1);
+                next_matrix(row_number);
+            }
         }
 
         void clear_ruled_out_rows(unsigned int row_number) {
@@ -202,78 +259,6 @@ class Matrix {
             }
         }
 
-        void next(unsigned int row_number) {
-            if (done) {
-                return;
-            }
-            if (row_number > 0 && state[row_number - 1] == -1) {
-                next(row_number - 1);
-            }
-
-            clear_ruled_out_rows(row_number);
-
-            if (non_permutating && state[row_number] == -1 && row_number > 0) {
-                state[row_number] = state[row_number - 1];
-                //printf("new: %d:%d %d:%d\n", row_number, state[row_number], row_number - 1, state[row_number - 1]);
-            }
-            for (int i = state[row_number] + 1; i < (int) base_rows.size(); ++i) {
-                //printf("hmm %d\n", i);
-                const unsigned int id = base_rows[i];
-                if (!acceptable_rows[id]) {
-                    continue;
-                }
-                const Row &row = all_rows[id];
-
-                state[row_number] = i;
-                memcpy(&m.m[row_number * N], row.data(), sizeof(unsigned int) * N);
-                if (row_number < N - 1) {
-                    rule_out_rows(row_number);
-                }
-                return;
-            }
-
-            if (row_number == 0) {
-                done = true;
-            } else {
-                state[row_number] = -1;
-                next(row_number - 1);
-                next(row_number);
-            }
-        }
-
-        NonsingularIterator &operator++() {
-            if (!done) {
-                next(N - 1);
-            }
-            return *this;
-        }
-
-        bool operator==(const NonsingularIterator &o) {
-            return m == o.m;
-        }
-
-        bool operator!=(const NonsingularIterator &o) {
-            return !(*this == o);
-        }
-
-        const Matrix &operator*() {
-            return m;
-        }
-
-        const Matrix *operator&() {
-            return &m;
-        }
-
-        bool is_done() const {
-            return done;
-        }
-
-        void set_non_permutating() {
-            non_permutating = true;
-        }
-
-     private:
-        Matrix<N, K> m;
         vector<unsigned int> coefficients;
         vector<unsigned int> base_rows;
         vector<Row> all_rows;
@@ -281,7 +266,6 @@ class Matrix {
         vector<vector<unsigned int>> ruled_out_rows;
         vector<unsigned int> base_ruled_out_rows;
         int state[N];
-        bool done;
         bool non_permutating = false;
     };
 
@@ -627,22 +611,24 @@ class Matrix {
         unsigned int last_timestamp = time(NULL);
         const Matrix<N, K> *m;
         Matrix<N, K> base;
-        NonsingularIterator it;
-        it.set_non_permutating();
+        MatrixIterator *it;
+        if (check_all) {
+            //it = new GeneralIterator();
+            it = new NonsingularIterator(true);
+        } else {
+            it = new RandomIterator(1000000000);
+        }
         while (true) {
-            if (check_all) {
-                ++it;
-                if (it.is_done()) {
-                    break;
-                }
-                m = &it;
-            } else {
-                if (c >= max_c) {
-                    break;
-                }
-                base.randomize();
-                m = &base;
+            if (it->is_done()) {
+                break;
             }
+            it->next();
+            m = &it->matrix();
+
+            if (c > max_c) {
+                break;
+            }
+
             if (time(NULL) >= last_timestamp + 5) {
                 ctmp = 10000 * c / max_c;
                 printf("%.f%% c:%s, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c.get_str().c_str(), z, s);
