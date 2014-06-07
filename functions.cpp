@@ -53,3 +53,12 @@ mpz_class phi_n(unsigned int n, unsigned int k) {
 
     return result;
 }
+
+unsigned int gcd(unsigned int a, unsigned int b) {
+    while (b != 0) {
+        unsigned int t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}

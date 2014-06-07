@@ -6,13 +6,18 @@
 #include <ctime>
 
 #include <algorithm>
+#include <iterator>
 #include <map>
+#include <set>
 #include <vector>
 #include <gmpxx.h>
 
 #include "functions.h"
 
 //#define DEBUG
+
+using std::set;
+using std::map;
 
 typedef struct {
     mpz_class lambda;
@@ -41,6 +46,245 @@ bool cmp_factors(const Factor &a, const Factor &b) {
 template <unsigned int N, unsigned int K>
 class Matrix {
  public:
+    class GeneralIterator : public std::iterator<std::input_iterator_tag, Matrix<N, K>> {
+     public:
+        GeneralIterator() {
+            m.zero();
+            done = false;
+        }
+
+        GeneralIterator(const GeneralIterator &o)
+            :m(o.m), done(o.done) {
+        }
+
+        GeneralIterator &operator++() {
+            if (!m.next()) {
+                done = true;
+            }
+            return *this;
+        }
+
+        bool operator==(const GeneralIterator &o) {
+            return m == o.m;
+        }
+
+        bool operator!=(const GeneralIterator &o) {
+            return !(*this == o);
+        }
+
+        const Matrix &operator*() {
+            return m;
+        }
+
+        const Matrix *operator&() {
+            return &m;
+        }
+
+        bool is_done() const {
+            return done;
+        }
+
+     private:
+        Matrix<N, K> m;
+        bool done;
+    };
+
+    class NonsingularIterator : public std::iterator<std::input_iterator_tag, Matrix<N, K>> {
+        typedef vector<unsigned int> Row;
+
+     public:
+        NonsingularIterator() {
+            Row row(N, 0);
+            ruled_out_rows = vector<vector<unsigned int>>(N);
+            unsigned int max_rows = 1;
+            for (unsigned int i = 0; i < N; ++i) {
+                max_rows *= K;
+                // reserve more and more for each level
+                ruled_out_rows[i].reserve(max_rows);
+            }
+
+            for (unsigned int i = 1; i < K; ++i) {
+                if (gcd(i, K) == 1) {
+                    coefficients.push_back(i);
+                }
+            }
+
+            all_rows.push_back(row);
+            while (true) {
+                int i = N - 1;
+                bool found_one = false;
+                while (i >= 0) {
+                    row[i] = (row[i] + 1) % K;
+                    if (row[i] != 0) {
+                        found_one = true;
+                        break;
+                    }
+                    --i;
+                }
+                if (!found_one) {
+                    break;
+                }
+                all_rows.push_back(row);
+            }
+
+            acceptable_rows = vector<bool>(all_rows.size(), false);
+            for (unsigned int i = 0; i < all_rows.size(); ++i) {
+                unsigned int g = K;
+                for (unsigned int j = 0; j < row.size(); ++j) {
+                    g = gcd(g, all_rows[i][j]);
+                    if (g == 1) {
+                        break;
+                    }
+                }
+                if (g == 1) {
+                    base_rows.push_back(i);
+                    acceptable_rows[i] = true;
+                } else {
+                    base_ruled_out_rows.push_back(i);
+                }
+            }
+
+            printf("rows: %d, usable: %d\n", (unsigned int) all_rows.size(),
+                (unsigned int) base_rows.size());
+            for (unsigned int i = 0; i < N; ++i) {
+                state[i] = -1;
+            }
+            done = false;
+        }
+
+        NonsingularIterator(const NonsingularIterator &o)
+            :m(o.m), done(o.done) {
+        }
+
+        void clear_ruled_out_rows(unsigned int row_number) {
+            vector<unsigned int> &relevant = ruled_out_rows[row_number];
+            for (unsigned int i = 0; i < relevant.size(); ++i) {
+                acceptable_rows[relevant[i]] = true;
+            }
+            relevant.clear();
+        }
+
+        void rule_out_rows(unsigned int row_number) {
+            // this contains the 0 row and for composite K all non relative prime multiples of
+            // rows
+            for (unsigned int j = 0; j < base_ruled_out_rows.size(); ++j) {
+                const Row &row = all_rows[base_ruled_out_rows[j]];
+                for (unsigned int c = 0; c < coefficients.size(); ++c) {
+                    unsigned int tmp = 0;
+                    for (unsigned int ii = 0; ii < N; ++ii) {
+                        tmp *= K;
+                        tmp += (row[ii] + all_rows[base_rows[state[row_number]]][ii] * coefficients[c]) % K;
+
+                    }
+                    if (acceptable_rows[tmp]) {
+                        acceptable_rows[tmp] = false;
+                        ruled_out_rows[row_number].push_back(tmp);
+                    }
+                }
+            }
+
+            for (unsigned int i = 0; i < row_number; ++i) {
+                for (unsigned int j = 0; j < ruled_out_rows[i].size(); ++j) {
+                    const Row &row = all_rows[ruled_out_rows[i][j]];
+                    for (unsigned int c = 0; c < coefficients.size(); ++c) {
+                        unsigned int tmp = 0;
+                        for (unsigned int ii = 0; ii < N; ++ii) {
+                            tmp *= K;
+                            tmp += (row[ii] + all_rows[base_rows[state[row_number]]][ii] * coefficients[c]) % K;
+
+                        }
+                        if (acceptable_rows[tmp]) {
+                            acceptable_rows[tmp] = false;
+                            ruled_out_rows[row_number].push_back(tmp);
+                        }
+                    }
+                }
+            }
+        }
+
+        void next(unsigned int row_number) {
+            if (done) {
+                return;
+            }
+            if (row_number > 0 && state[row_number - 1] == -1) {
+                next(row_number - 1);
+            }
+
+            clear_ruled_out_rows(row_number);
+
+            if (non_permutating && state[row_number] == -1 && row_number > 0) {
+                state[row_number] = state[row_number - 1];
+                //printf("new: %d:%d %d:%d\n", row_number, state[row_number], row_number - 1, state[row_number - 1]);
+            }
+            for (int i = state[row_number] + 1; i < (int) base_rows.size(); ++i) {
+                //printf("hmm %d\n", i);
+                const unsigned int id = base_rows[i];
+                if (!acceptable_rows[id]) {
+                    continue;
+                }
+                const Row &row = all_rows[id];
+
+                state[row_number] = i;
+                memcpy(&m.m[row_number * N], row.data(), sizeof(unsigned int) * N);
+                if (row_number < N - 1) {
+                    rule_out_rows(row_number);
+                }
+                return;
+            }
+
+            if (row_number == 0) {
+                done = true;
+            } else {
+                state[row_number] = -1;
+                next(row_number - 1);
+                next(row_number);
+            }
+        }
+
+        NonsingularIterator &operator++() {
+            if (!done) {
+                next(N - 1);
+            }
+            return *this;
+        }
+
+        bool operator==(const NonsingularIterator &o) {
+            return m == o.m;
+        }
+
+        bool operator!=(const NonsingularIterator &o) {
+            return !(*this == o);
+        }
+
+        const Matrix &operator*() {
+            return m;
+        }
+
+        const Matrix *operator&() {
+            return &m;
+        }
+
+        bool is_done() const {
+            return done;
+        }
+
+        void set_non_permutating() {
+            non_permutating = true;
+        }
+
+     private:
+        Matrix<N, K> m;
+        vector<unsigned int> coefficients;
+        vector<unsigned int> base_rows;
+        vector<Row> all_rows;
+        vector<bool> acceptable_rows;
+        vector<vector<unsigned int>> ruled_out_rows;
+        vector<unsigned int> base_ruled_out_rows;
+        int state[N];
+        bool done;
+        bool non_permutating = false;
+    };
+
     inline Matrix() {
         m = new unsigned int[N * N];
     }
@@ -54,6 +298,15 @@ class Matrix {
         if (m) {
             delete[] m;
         }
+    }
+
+    inline void operator==(const Matrix<N, K> &other) {
+        for (unsigned int i = 0; i < N * N; ++i) {
+            if (m[i] != other.m) {
+                return false;
+            }
+        }
+        return true;
     }
 
     inline void operator=(const Matrix<N, K> &other) {
@@ -282,16 +535,17 @@ class Matrix {
         return id;
     }
 
-    Cycle get_cycle(const mpz_class &size) const {
+    Cycle get_cycle(const mpz_class &size, set<mpz_class> &seen) const {
         Cycle cycle;
         assert(size.fits_uint_p());
         if (size != 0) {
             cycle.reserve(size.get_ui());
         }
         Matrix<N, K> tmp = *this;
-        tmp.print();
         while (!tmp.is_identity()) {
-            cycle.push_back(tmp.get_id());
+            mpz_class id = tmp.get_id();
+            seen.insert(id);
+            cycle.push_back(id);
             tmp.mult(*this);
         }
         cycle.push_back(tmp.get_id());
@@ -363,37 +617,50 @@ class Matrix {
         if (phi < 50000000) {
             check_all = true;
         }
-        Matrix<N, K> m;
-        m.zero();
         unsigned int z = 0;
         unsigned int s = 0;
-        mpz_class c, max_c = 200000, ctmp;
+        mpz_class c, max_c = 2000000, ctmp;
         if (check_all) {
             max_c = phi;
         }
         Matrix<N, K> tmp, tmp2;
         unsigned int last_timestamp = time(NULL);
+        const Matrix<N, K> *m;
+        Matrix<N, K> base;
+        NonsingularIterator it;
+        it.set_non_permutating();
         while (true) {
             if (check_all) {
-                if (!m.next()) {
+                ++it;
+                if (it.is_done()) {
                     break;
                 }
+                m = &it;
             } else {
                 if (c >= max_c) {
                     break;
                 }
-                m.randomize();
+                base.randomize();
+                m = &base;
             }
             if (time(NULL) >= last_timestamp + 5) {
                 ctmp = 10000 * c / max_c;
                 printf("%.f%% c:%s, z:%d, s:%d\n", (float) ctmp.get_ui() / 100, c.get_str().c_str(), z, s);
                 last_timestamp = time(NULL);
             }
+            /*++c;
+            if (c >= 20000000) {
+                m->print();
+            m->power(phi, tmp);
+            tmp.print();
+                break;
+            }
+            continue;*/
 
             //printf("%d %d\n", c, z);
             //m.print();
             mpz_class e = 1;
-            m.power(phi, tmp);
+            m->power(phi, tmp);
             if (tmp.is_zero()) {
                 ++z;
                 continue;
@@ -403,7 +670,7 @@ class Matrix {
                 continue;
             }
 
-            m.power(result, tmp);
+            m->power(result, tmp);
             if (tmp.is_identity()) {
                 ++c;
                 continue;
@@ -445,6 +712,7 @@ class Matrix {
         ExponentMap result;
         ExponentMap permutation_map;
         vector<Cycle> cycles;
+        set<mpz_class> seen;
 
         mpz_class num_matrices = 1;
         for (unsigned int i = 0; i < N * N; ++i) {
@@ -506,7 +774,11 @@ class Matrix {
                     ++permutation_map[e];
                 }
             }
-            cycles.push_back(m.get_cycle(e));
+
+            mpz_class id = m.get_id();
+            if (seen.find(id) == seen.end()) {
+                cycles.push_back(m.get_cycle(e, seen));
+            }
         }
 
         unsigned int confidence;
