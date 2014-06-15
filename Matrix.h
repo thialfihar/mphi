@@ -71,12 +71,12 @@ class Matrix {
     class GeneralIterator : public MatrixIterator {
      public:
         GeneralIterator() : MatrixIterator() {
-            MatrixIterator::m.zero();
+            this->m.zero();
         }
 
         virtual void next() {
-            if (!MatrixIterator::m.next()) {
-                MatrixIterator::done = true;
+            if (!this->m.next()) {
+                this->done = true;
             }
         }
     };
@@ -88,14 +88,14 @@ class Matrix {
         }
 
         virtual void next() {
-            if (MatrixIterator::done) {
+            if (this->done) {
                 return;
             }
 
-            MatrixIterator::m.randomize();
+            this->m.randomize();
             --size;
             if (size == 0) {
-                MatrixIterator::done = true;
+                this->done = true;
             }
         }
 
@@ -165,18 +165,18 @@ class Matrix {
             for (unsigned int i = 0; i < N; ++i) {
                 state[i] = -1;
             }
-            MatrixIterator::done = false;
+            this->done = false;
         }
 
         virtual void next() {
-            if (!MatrixIterator::done) {
+            if (!this->done) {
                 next_matrix(N - 1);
             }
         }
 
      protected:
-        void next_matrix(unsigned int row_number) {
-            if (MatrixIterator::done) {
+        virtual void next_matrix(unsigned int row_number) {
+            if (this->done) {
                 return;
             }
             if (row_number > 0 && state[row_number - 1] == -1) {
@@ -198,7 +198,7 @@ class Matrix {
                 const Row &row = all_rows[id];
 
                 state[row_number] = i;
-                memcpy(&MatrixIterator::m.m[row_number * N], row.data(), sizeof(unsigned int) * N);
+                memcpy(&this->m.m[row_number * N], row.data(), sizeof(unsigned int) * N);
                 if (row_number < N - 1) {
                     rule_out_rows(row_number);
                 }
@@ -206,7 +206,7 @@ class Matrix {
             }
 
             if (row_number == 0) {
-                MatrixIterator::done = true;
+                this->done = true;
             } else {
                 state[row_number] = -1;
                 next_matrix(row_number - 1);
@@ -270,6 +270,84 @@ class Matrix {
         bool non_permutating = false;
     };
 
+    class RandomNonsingularIterator : public NonsingularIterator {
+        typedef vector<unsigned int> Row;
+
+     public:
+        RandomNonsingularIterator(bool non_permutating, unsigned int size) : NonsingularIterator(non_permutating),
+            size(size) {
+        }
+
+        virtual void next() {
+            if (this->done) {
+                return;
+            }
+
+            for (unsigned int i = 0; i < N; ++i) {
+                this->clear_ruled_out_rows(i);
+                this->state[i] = -1;
+            }
+
+            next_matrix(N - 1);
+
+            --size;
+            if (size == 0) {
+                this->done = true;
+            }
+        }
+
+     protected:
+        virtual void next_matrix(unsigned int row_number) {
+            if (this->done) {
+                return;
+            }
+            if (row_number > 0 && this->state[row_number - 1] == -1) {
+                next_matrix(row_number - 1);
+            }
+
+            this->clear_ruled_out_rows(row_number);
+
+            if (this->non_permutating && this->state[row_number] == -1 && row_number > 0) {
+                this->state[row_number] = this->state[row_number - 1];
+                //printf("new: %d:%d %d:%d\n", row_number, state[row_number], row_number - 1, state[row_number - 1]);
+            }
+
+            int chosen_row = -1;
+            int count = 0;
+            for (int i = this->state[row_number] + 1; i < (int) this->base_rows.size(); ++i) {
+                const unsigned int id = this->base_rows[i];
+                if (!this->acceptable_rows[id]) {
+                    continue;
+                }
+                ++count;
+                if (chosen_row == -1 ||
+                    (unsigned int) ((float) rand() * count / RAND_MAX) == 0) {
+                    chosen_row = i;
+                }
+            }
+            if (chosen_row >= 0) {
+                const unsigned int id = this->base_rows[chosen_row];
+                const Row &row = this->all_rows[id];
+
+                this->state[row_number] = chosen_row;
+                memcpy(&this->m.m[row_number * N], row.data(), sizeof(unsigned int) * N);
+                if (row_number < N - 1) {
+                    this->rule_out_rows(row_number);
+                }
+                return;
+            }
+
+
+            if (row_number > 0) {
+                this->state[row_number] = -1;
+                next_matrix(row_number - 1);
+                next_matrix(row_number);
+            }
+        }
+
+        unsigned int size;
+    };
+
     inline Matrix() {
         m = new unsigned int[N * N];
     }
@@ -304,7 +382,7 @@ class Matrix {
 
     inline void randomize() {
         for (unsigned int i = 0; i < N * N; ++i) {
-            m[i] = ((unsigned int) rand() % (2 * 1000000)) / 1000000;
+            m[i] = ((unsigned int) rand() % (K * 1000000)) / 1000000;
         }
     }
 
@@ -635,31 +713,36 @@ class Matrix {
         mpz_class result = 1;
         bool result_changed = false;
 
+        MatrixIterator *it;
+        if (check_all) {
+            //it = new GeneralIterator();
+            it = new NonsingularIterator(true);
+            for (unsigned int i = 2; i <= N; ++i) {
+                max_c /= i;
+            }
+        } else {
+            //it = new RandomIterator(1000000000);
+            it = new RandomNonsingularIterator(false, max_c.get_ui());
+        }
+
         #pragma omp parallel firstprivate(factors)
         {
-            MatrixIterator *it;
-            if (check_all) {
-                //it = new GeneralIterator();
-                it = new NonsingularIterator(true);
-            } else {
-                it = new RandomIterator(1000000000);
-            }
             mpz_class local_result = 1;
             Matrix<N, K> tmp, tmp2;
             Matrix<N, K> m;
             Matrix<N, K> base;
             unsigned int *buffer = new unsigned int [N * N];
             while (goon) {
-                //lock_iterator.lock();
+                lock_iterator.lock();
                 goon = !it->is_done();
-                //lock_iterator.unlock();
+                lock_iterator.unlock();
                 if (!goon) {
                     break;
                 }
-                //lock_iterator.lock();
+                lock_iterator.lock();
                 it->next();
                 m = it->matrix();
-                //lock_iterator.unlock();
+                lock_iterator.unlock();
 
                 if (c > max_c) {
                     break;
@@ -716,8 +799,8 @@ class Matrix {
                 ++c;
 
                 if (e > 1) {
-                    lock_result.lock();
                     local_result *= e;
+                    lock_result.lock();
                     mpz_class old_result = result;
                     mpz_lcm(result.get_mpz_t(), result.get_mpz_t(), local_result.get_mpz_t());
                     if (result != old_result) {
